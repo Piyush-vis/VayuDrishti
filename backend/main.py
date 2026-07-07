@@ -63,4 +63,6 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=settings.ENVIRONMENT == "development")
+    import os
+    app_import = "backend.main:app" if os.path.isdir("backend") else "main:app"
+    uvicorn.run(app_import, host=settings.HOST, port=settings.PORT, reload=settings.ENVIRONMENT == "development")
