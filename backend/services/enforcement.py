@@ -49,7 +49,9 @@ class EnforcementService:
             if not s_readings:
                 continue
                 
-            station = station_map[s_id]
+            station = station_map.get(s_id)
+            if not station:
+                continue
             latest = s_readings[0]
             
             # Analyze pollutants

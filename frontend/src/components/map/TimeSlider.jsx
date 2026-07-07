@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 
 const TimeSlider = ({ onChange, startHour = -24, endHour = 0 }) => {
@@ -20,9 +20,14 @@ const TimeSlider = ({ onChange, startHour = -24, endHour = 0 }) => {
     return () => clearInterval(interval);
   }, [isPlaying, startHour, endHour]);
 
+  const onChangeRef = useRef(onChange);
   useEffect(() => {
-    onChange(value);
-  }, [value, onChange]);
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    onChangeRef.current(value);
+  }, [value]);
 
   const togglePlay = () => {
     setIsPlaying(!isPlaying);
