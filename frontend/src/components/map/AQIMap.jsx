@@ -28,14 +28,19 @@ const createCustomMarkerIcon = (aqi, category) => {
   });
 };
 
-// Component to handle map centering when city changes
 const MapRecenter = ({ center }) => {
   const map = useMap();
+  const [prevCenter, setPrevCenter] = useState(null);
+  
   useEffect(() => {
     if (center) {
-      map.setView(center, map.getZoom());
+      const centerChanged = !prevCenter || prevCenter[0] !== center[0] || prevCenter[1] !== center[1];
+      if (centerChanged) {
+        map.setView(center, map.getZoom());
+        setPrevCenter(center);
+      }
     }
-  }, [center, map]);
+  }, [center, map, prevCenter]);
   return null;
 };
 

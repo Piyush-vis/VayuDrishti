@@ -4,6 +4,7 @@ from typing import Dict, Any, List
 import google.generativeai as genai
 from backend.config import settings
 from backend.models.database import db_helper
+from backend.services.data_ingestion import CITIES_COORDS
 
 # Configure Google Gemini
 if settings.GEMINI_API_KEY:
