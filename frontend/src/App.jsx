@@ -209,7 +209,8 @@ function App() {
                     if (val !== 0) {
                       const modifiedReadings = currentReadings.map(r => {
                         const baseAqi = r.reading.aqi;
-                        const factor = 1.0 + (Math.sin((val + r.reading.timestamp.getHours()) * 0.2) * 0.15);
+                        const timestampDate = new Date(r.reading.timestamp);
+                        const factor = 1.0 + (Math.sin((val + timestampDate.getHours()) * 0.2) * 0.15);
                         return {
                           ...r,
                           reading: {

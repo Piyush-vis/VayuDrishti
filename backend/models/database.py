@@ -28,7 +28,11 @@ class MockCursor:
             except Exception:
                 pass
         return self
-        
+
+    def limit(self, count):
+        self.items = self.items[:count]
+        return self
+
     async def to_list(self, length=None):
         return self.items[:length] if length else self.items
 

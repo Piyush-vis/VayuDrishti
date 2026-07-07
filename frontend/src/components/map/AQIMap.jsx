@@ -123,6 +123,10 @@ const AQIMap = ({
         center={center}
         zoom={11}
         scrollWheelZoom={true}
+        dragging={true}
+        doubleClickZoom={true}
+        touchZoom={true}
+        style={{ height: '100%', width: '100%' }}
         className="w-full h-full"
       >
         {/* Dark Mode Map Tiles */}
