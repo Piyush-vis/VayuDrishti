@@ -1,0 +1,59 @@
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:8000/api/v1';
+
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+export const stationsApi = {
+  list: (city) => apiClient.get(`/stations${city ? `?city=${city}` : ''}`).then(r => r.data),
+  get: (id) => apiClient.get(`/stations/${id}`).then(r => r.data),
+  readings: (id, hours = 24) => apiClient.get(`/stations/${id}/readings?hours=${hours}`).then(r => r.data),
+};
+
+export const aqiApi = {
+  current: (city) => apiClient.get(`/aqi/current?city=${city}`).then(r => r.data),
+  history: (id, start, end) => apiClient.get(`/aqi/history?station_id=${id}&start=${start}&end=${end}`).then(r => r.data),
+  heatmap: (city) => apiClient.get(`/aqi/heatmap?city=${city}`).then(r => r.data),
+  compare: (cities) => apiClient.get(`/aqi/compare?cities=${cities}`).then(r => r.data),
+};
+
+export const predictApi = {
+  forecast: (id, hours = 72) => apiClient.get(`/predict/forecast?station_id=${id}&hours=${hours}`).then(r => r.data),
+  alerts: (city, threshold = 300) => apiClient.get(`/predict/alerts?city=${city}&threshold=${threshold}`).then(r => r.data),
+  trigger: (id) => apiClient.post(`/predict/trigger-forecast${id ? `?station_id=${id}` : ''}`).then(r => r.data),
+};
+
+export const attributionApi = {
+  sources: (city, zone) => apiClient.get(`/attribution/sources?city=${city}${zone ? `&zone=${zone}` : ''}`).then(r => r.data),
+  evidence: (city, zone) => apiClient.get(`/attribution/evidence?city=${city}&zone=${zone}`).then(r => r.data),
+  industrial: (city) => apiClient.get(`/attribution/industrial?city=${city}`).then(r => r.data),
+};
+
+export const enforcementApi = {
+  actions: (city) => apiClient.get(`/enforcement/actions?city=${city}`).then(r => r.data),
+  get: (id) => apiClient.get(`/enforcement/actions/${id}`).then(r => r.data),
+  update: (id, status) => apiClient.patch(`/enforcement/actions/${id}?status=${status}`).then(r => r.data),
+};
+
+export const advisoryApi = {
+  citizen: (city, zone) => apiClient.get(`/advisory/citizen?city=${city}${zone ? `&zone=${zone}` : ''}`).then(r => r.data),
+  vulnerabilityMap: (city) => apiClient.get(`/advisory/vulnerability-map?city=${city}`).then(r => r.data),
+  generate: (city, zone) => apiClient.post(`/advisory/generate?city=${city}&zone=${zone}`).then(r => r.data),
+};
+
+export const chatApi = {
+  query: (question) => apiClient.post('/chat/query', { question }).then(r => r.data),
+};
+
+export const dataApi = {
+  ingest: () => apiClient.post('/data/ingest').then(r => r.data),
+  seed: (days = 7) => apiClient.post(`/data/seed?days=${days}`).then(r => r.data),
+  status: () => apiClient.get('/data/status').then(r => r.data),
+};
+
+export default apiClient;
