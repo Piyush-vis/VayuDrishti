@@ -69,5 +69,12 @@ async def seed_database():
         await db_helper.citizen_advisories.create_index([("city", 1), ("zone", 1), ("generated_at", -1)])
         
         print("Database indexes created successfully.")
+
+        # 4. Check if readings exist, if not seed 7 days of historical data
+        readings_count = await db_helper.aqi_readings.count_documents({})
+        if readings_count == 0:
+            print("No AQI readings found. Seeding 7 days of historical hourly data automatically...")
+            from backend.services.data_ingestion import seed_historical_data
+            await seed_historical_data(days_back=7)
     except Exception as e:
         print(f"Error seeding database: {e}")
