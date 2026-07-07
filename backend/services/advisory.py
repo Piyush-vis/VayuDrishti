@@ -260,7 +260,7 @@ class AdvisoryService:
         """
         Use Gemini 1.5 Flash to generate localized, multi-language health advisories in JSON.
         """
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-flash-latest")
         
         prompt = f"""
         You are an advanced air quality health advisory system for Indian cities.

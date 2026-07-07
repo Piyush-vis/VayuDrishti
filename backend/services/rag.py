@@ -229,7 +229,7 @@ async def generate_rag_response(question: str) -> Dict[str, Any]:
     if settings.GEMINI_API_KEY:
         try:
             import google.generativeai as genai
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel("gemini-flash-latest")
             
             prompt = f"""
             You are VayuDrishti's regulatory assistant. You answer questions about Indian air quality policies, CPCB standards, and the National Clean Air Programme (NCAP) using ONLY the provided regulatory context.
