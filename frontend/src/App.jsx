@@ -22,7 +22,8 @@ import {
   Activity, 
   TrendingUp, 
   BookOpen, 
-  AlertTriangle 
+  AlertTriangle,
+  Bot
 } from 'lucide-react';
 
 function App() {
@@ -48,6 +49,7 @@ function App() {
   const [compareData, setCompareData] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [syncTime, setSyncTime] = useState(new Date());
+  const [showChat, setShowChat] = useState(false);
 
   const fetchBaseData = async () => {
     try {
@@ -308,8 +310,7 @@ function App() {
                   </div>
                 )}
 
-                {/* 3. CPCB Regulations Chatbot */}
-                <ChatPanel />
+                {/* 3. CPCB Regulations Chatbot removed from here and moved to a floating layout */}
               </div>
 
             </div>
@@ -465,6 +466,29 @@ function App() {
 
       {/* Bottom Footer */}
       <Footer />
+
+      {/* Floating CPCB Regulations Chatbot */}
+      <div className="fixed bottom-6 right-6 z-[2000] flex flex-col items-end">
+        {/* Chat Window Popup */}
+        {showChat && (
+          <div className="mb-4 w-[320px] sm:w-[400px] shadow-2xl rounded-2xl overflow-hidden border border-slate-800/80 bg-slate-900">
+            <ChatPanel onClose={() => setShowChat(false)} />
+          </div>
+        )}
+
+        {/* Toggle Button */}
+        <button
+          onClick={() => setShowChat(!showChat)}
+          className={`h-14 w-14 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-95 border ${
+            showChat 
+              ? 'bg-slate-800 text-slate-300 hover:text-white border-slate-700' 
+              : 'bg-blue-600 hover:bg-blue-500 text-white hover:shadow-blue-500/25 border-blue-500/30'
+          }`}
+          title={showChat ? "Close Compliance Assistant" : "Query CPCB Compliance Assistant"}
+        >
+          <Bot className="h-6 w-6" />
+        </button>
+      </div>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { chatApi } from '../../services/api';
 import { Send, Bot, User, BookOpen } from 'lucide-react';
 
-const ChatPanel = () => {
+const ChatPanel = ({ onClose }) => {
   const [messages, setMessages] = useState([
     {
       sender: 'bot',
@@ -60,14 +60,26 @@ const ChatPanel = () => {
   return (
     <div className="flex flex-col h-[500px] glass-card overflow-hidden">
       {/* Header */}
-      <div className="bg-slate-900/60 px-4 py-3 border-b border-slate-800/80 flex items-center gap-2 shrink-0">
-        <div className="p-1 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20">
-          <BookOpen className="h-4 w-4" />
+      <div className="bg-slate-900/60 px-4 py-3 border-b border-slate-800/80 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="p-1 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20">
+            <BookOpen className="h-4 w-4" />
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-white uppercase tracking-wider">CPCB Policy RAG Bot</h3>
+            <p className="text-[9px] text-slate-500 font-medium">Verify air quality standards and compliance protocols</p>
+          </div>
         </div>
-        <div>
-          <h3 className="text-xs font-bold text-white uppercase tracking-wider">CPCB Policy RAG Bot</h3>
-          <p className="text-[9px] text-slate-500 font-medium">Verify air quality standards and compliance protocols</p>
-        </div>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-white transition-all text-xs font-bold px-2 py-1 rounded hover:bg-slate-800/60"
+            title="Close Assistant"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {/* Messages area */}
