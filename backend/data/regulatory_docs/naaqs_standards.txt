@@ -1,0 +1,44 @@
+CPCB National Ambient Air Quality Standards (NAAQS)
+Notification Date: 18th November, 2009
+
+The Central Pollution Control Board (CPCB) has set standard limits for ambient air quality parameters across India to protect public health and the environment.
+
+1. Particulate Matter 2.5 (PM2.5):
+   - Annual Average Limit: 40 µg/m³
+   - 24-Hour Average Limit: 60 µg/m³
+   - Measured using Gravimetric / Beta Attenuation method.
+
+2. Particulate Matter 10 (PM10):
+   - Annual Average Limit: 60 µg/m³
+   - 24-Hour Average Limit: 100 µg/m³
+   - Measured using Gravimetric / TEOM method.
+
+3. Nitrogen Dioxide (NO2):
+   - Annual Average Limit: 40 µg/m³
+   - 24-Hour Average Limit: 80 µg/m³
+   - Measured using Jacob & Hochheiser / Chemiluminescence method.
+
+4. Sulphur Dioxide (SO2):
+   - Annual Average Limit: 50 µg/m³
+   - 24-Hour Average Limit: 80 µg/m³
+   - Measured using Improved West & Gaeke / UV Fluorescence method.
+
+5. Ozone (O3):
+   - 8-Hour Average Limit: 100 µg/m³
+   - 1-Hour Average Limit: 180 µg/m³
+   - Measured using UV Photometric / Chemiluminescence method.
+
+6. Carbon Monoxide (CO):
+   - 8-Hour Average Limit: 2 mg/m³ (2000 µg/m³)
+   - 1-Hour Average Limit: 4 mg/m³ (4000 µg/m³)
+   - Measured using Non-Dispersive Infrared Spectroscopy (NDIR).
+
+7. Ammonia (NH3):
+   - Annual Average Limit: 100 µg/m³
+   - 24-Hour Average Limit: 400 µg/m³
+   - Measured using Indophenol blue method.
+
+8. Lead (Pb):
+   - Annual Average Limit: 0.50 µg/m³
+   - 24-Hour Average Limit: 1.0 µg/m³
+   - Measured using AAS / ICP-MS after high-volume sampling.
