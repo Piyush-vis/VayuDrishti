@@ -1,0 +1,253 @@
+[
+  {
+    "station_id": "delhi_anand_vihar",
+    "name": "Anand Vihar, Delhi",
+    "city": "delhi",
+    "latitude": 28.6469,
+    "longitude": 77.3164,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "East Delhi"
+  },
+  {
+    "station_id": "delhi_punjabi_bagh",
+    "name": "Punjabi Bagh, Delhi",
+    "city": "delhi",
+    "latitude": 28.6687,
+    "longitude": 77.1293,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "West Delhi"
+  },
+  {
+    "station_id": "delhi_rk_puram",
+    "name": "R.K. Puram, Delhi",
+    "city": "delhi",
+    "latitude": 28.5638,
+    "longitude": 77.1860,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "South Delhi"
+  },
+  {
+    "station_id": "delhi_mandir_marg",
+    "name": "Mandir Marg, Delhi",
+    "city": "delhi",
+    "latitude": 28.6341,
+    "longitude": 77.2005,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "Central Delhi"
+  },
+  {
+    "station_id": "delhi_dwarka",
+    "name": "Dwarka Sector 8, Delhi",
+    "city": "delhi",
+    "latitude": 28.5710,
+    "longitude": 77.0719,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "Dwarka"
+  },
+  {
+    "station_id": "mumbai_bandra",
+    "name": "Bandra, Mumbai",
+    "city": "mumbai",
+    "latitude": 19.0596,
+    "longitude": 72.8295,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "Mumbai Suburbs"
+  },
+  {
+    "station_id": "mumbai_colaba",
+    "name": "Colaba, Mumbai",
+    "city": "mumbai",
+    "latitude": 18.9067,
+    "longitude": 72.8147,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "South Mumbai"
+  },
+  {
+    "station_id": "mumbai_kurla",
+    "name": "Kurla, Mumbai",
+    "city": "mumbai",
+    "latitude": 19.0652,
+    "longitude": 72.8794,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "East Mumbai"
+  },
+  {
+    "station_id": "mumbai_worli",
+    "name": "Worli, Mumbai",
+    "city": "mumbai",
+    "latitude": 19.0016,
+    "longitude": 72.8166,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "South-Central Mumbai"
+  },
+  {
+    "station_id": "mumbai_borivali",
+    "name": "Borivali East, Mumbai",
+    "city": "mumbai",
+    "latitude": 19.2290,
+    "longitude": 72.8644,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "North Mumbai"
+  },
+  {
+    "station_id": "bengaluru_silk_board",
+    "name": "Silk Board, Bengaluru",
+    "city": "bengaluru",
+    "latitude": 12.9174,
+    "longitude": 77.6228,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "South Bengaluru"
+  },
+  {
+    "station_id": "bengaluru_btm_layout",
+    "name": "BTM Layout, Bengaluru",
+    "city": "bengaluru",
+    "latitude": 12.9141,
+    "longitude": 77.6047,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "South Bengaluru"
+  },
+  {
+    "station_id": "bengaluru_hebbal",
+    "name": "Hebbal, Bengaluru",
+    "city": "bengaluru",
+    "latitude": 13.0359,
+    "longitude": 77.5970,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "North Bengaluru"
+  },
+  {
+    "station_id": "bengaluru_peenya",
+    "name": "Peenya, Bengaluru",
+    "city": "bengaluru",
+    "latitude": 13.0285,
+    "longitude": 77.5195,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "West Bengaluru"
+  },
+  {
+    "station_id": "kolkata": "kolkata_victoria",
+    "station_id": "kolkata_victoria",
+    "name": "Victoria Memorial, Kolkata",
+    "city": "kolkata",
+    "latitude": 22.5448,
+    "longitude": 88.3426,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "Central Kolkata"
+  },
+  {
+    "station_id": "kolkata_ballygunge",
+    "name": "Ballygunge, Kolkata",
+    "city": "kolkata",
+    "latitude": 22.5280,
+    "longitude": 88.3659,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "South Kolkata"
+  },
+  {
+    "station_id": "kolkata_jadavpur",
+    "name": "Jadavpur, Kolkata",
+    "city": "kolkata",
+    "latitude": 22.4955,
+    "longitude": 88.3709,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "South Kolkata"
+  },
+  {
+    "station_id": "chennai_alandur",
+    "name": "Alandur, Chennai",
+    "city": "chennai",
+    "latitude": 12.9972,
+    "longitude": 80.2006,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "South Chennai"
+  },
+  {
+    "station_id": "chennai_velachery",
+    "name": "Velachery, Chennai",
+    "city": "chennai",
+    "latitude": 12.9801,
+    "longitude": 80.2228,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "South Chennai"
+  },
+  {
+    "station_id": "chennai_manali",
+    "name": "Manali, Chennai",
+    "city": "chennai",
+    "latitude": 13.1682,
+    "longitude": 80.2590,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "North Chennai"
+  },
+  {
+    "station_id": "hyderabad_sanathnagar",
+    "name": "Sanathnagar, Hyderabad",
+    "city": "hyderabad",
+    "latitude": 17.4589,
+    "longitude": 78.4325,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "Central Hyderabad"
+  },
+  {
+    "station_id": "hyderabad_zoo_park",
+    "name": "Zoo Park, Hyderabad",
+    "city": "hyderabad",
+    "latitude": 17.3489,
+    "longitude": 78.4490,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "South Hyderabad"
+  },
+  {
+    "station_id": "lucknow_lalbagh",
+    "name": "Lalbagh, Lucknow",
+    "city": "lucknow",
+    "latitude": 26.8488,
+    "longitude": 80.9425,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "Central Lucknow"
+  },
+  {
+    "station_id": "lucknow_talkatora",
+    "name": "Talkatora, Lucknow",
+    "city": "lucknow",
+    "latitude": 26.8335,
+    "longitude": 80.8986,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "West Lucknow"
+  },
+  {
+    "station_id": "jabalpur_civic_centre",
+    "name": "Civic Centre, Jabalpur",
+    "city": "jabalpur",
+    "latitude": 23.1678,
+    "longitude": 79.9326,
+    "type": "CAAQMS",
+    "active": true,
+    "zone": "Central Jabalpur"
+  }
+]

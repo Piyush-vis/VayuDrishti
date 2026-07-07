@@ -15,14 +15,15 @@ from backend.routers import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup tasks:
-    # 1. Connect to MongoDB
-    # 2. Seed static stations if empty
+    # Startup tasks
     print("VayuDrishti API Starting Up...")
+    from backend.models.database import db_helper, seed_database
+    db_helper.connect()
+    await seed_database()
     yield
-    # Shutdown tasks:
-    # 1. Disconnect from database
+    # Shutdown tasks
     print("VayuDrishti API Shutting Down...")
+    db_helper.disconnect()
 
 app = FastAPI(
     title="VayuDrishti (वायुदृष्टि) API",
