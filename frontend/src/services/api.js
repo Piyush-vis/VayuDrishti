@@ -92,6 +92,8 @@ export const dataApi = {
   ingest: () => apiClient.post('/data/ingest').then(r => r.data),
   seed: (days = 7) => apiClient.post(`/data/seed?days=${days}`).then(r => r.data),
   status: () => apiClient.get('/data/status').then(r => r.data),
+  govFeed: (limit = 100) => apiClient.get(`/data/gov-feed?limit=${limit}`).then(r => r.data),
+  govCoverage: () => apiClient.get('/data/gov-feed/coverage').then(r => r.data),
 };
 
 export default apiClient;

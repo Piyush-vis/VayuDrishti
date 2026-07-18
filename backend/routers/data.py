@@ -1,9 +1,24 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from backend.services.data_ingestion import ingest_all_cities, seed_historical_data
+from backend.services.gov_feed import gov_feed_service
 from backend.models.database import db_helper
 from datetime import datetime
 
 router = APIRouter(prefix="/data", tags=["data"])
+
+
+@router.get("/gov-feed")
+async def gov_feed(limit: int = Query(default=100, ge=1, le=500),
+                   city: str = Query(default=None), state: str = Query(default=None)):
+    """Live pull from the official Government of India CPCB CAAQMS feed
+    (data.gov.in). Proves the platform ingests the national feed directly."""
+    return await gov_feed_service.fetch_records(limit=limit, city=city, state=state)
+
+
+@router.get("/gov-feed/coverage")
+async def gov_feed_coverage():
+    """Scalability headline: station/city/state coverage of the official feed."""
+    return await gov_feed_service.coverage_summary()
 
 @router.post("/ingest")
 async def trigger_ingestion(background_tasks: BackgroundTasks):

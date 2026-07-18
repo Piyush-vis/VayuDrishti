@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     TOMTOM_API_KEY: str = ""
     NASA_FIRMS_MAP_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    # data.gov.in official CPCB CAAQMS feed. Defaults to data.gov.in's PUBLIC
+    # sample key (documented, rate-limited, not a secret) so the scalability demo
+    # works out of the box; users can supply a free personal key for higher limits.
+    DATA_GOV_IN_API_KEY: str = "579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b"
 
     # App Config
     ENVIRONMENT: str = "development"

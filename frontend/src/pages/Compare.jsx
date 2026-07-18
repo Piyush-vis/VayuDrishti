@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import React, { useState, useEffect } from 'react';
 import CityComparisonChart from '../components/charts/CityComparisonChart';
 import AQIBadge from '../components/common/AQIBadge';
+import GovFeedPanel from '../components/panels/GovFeedPanel';
 import { aqiApi } from '../services/api';
 import { useReplay } from '../context/ReplayContext';
 
@@ -67,6 +68,8 @@ function Compare() {
           </div>
         </div>
       </div>
+
+      <GovFeedPanel />
     </motion.div>
   );
 }
