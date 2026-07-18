@@ -35,11 +35,12 @@ const ChatPanel = ({ onClose }) => {
     try {
       const resp = await chatApi.query(userQuestion);
       setMessages((prev) => [
-        ...prev, 
-        { 
-          sender: 'bot', 
-          text: resp.answer, 
-          sources: resp.sources || [] 
+        ...prev,
+        {
+          sender: 'bot',
+          text: resp.answer,
+          sources: resp.sources || [],
+          provenance: resp.provenance,
         }
       ]);
     } catch (err) {
@@ -105,6 +106,15 @@ const ChatPanel = ({ onClose }) => {
               {msg.sources && msg.sources.length > 0 && (
                 <div className="flex flex-wrap gap-1 px-1">
                   <span className="text-[8px] text-slate-500 font-semibold uppercase tracking-wider mr-1 mt-0.5">Sources:</span>
+                  {msg.provenance && (msg.provenance === 'cached' || msg.provenance === 'live' || msg.provenance === 'retrieval-only') && (
+                    <span className={`text-[8px] font-bold px-1 rounded border ${
+                      msg.provenance === 'live' ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
+                      : msg.provenance === 'cached' ? 'text-sky-400 border-sky-500/40 bg-sky-500/10'
+                      : 'text-amber-400 border-amber-500/40 bg-amber-500/10'
+                    }`}>
+                      {msg.provenance === 'retrieval-only' ? 'RETRIEVAL' : msg.provenance.toUpperCase()}
+                    </span>
+                  )}
                   {msg.sources.map((s, sIdx) => (
                     <span key={sIdx} className="text-[8px] font-bold bg-slate-800 text-slate-400 border border-slate-700 px-1 rounded">
                       {s}

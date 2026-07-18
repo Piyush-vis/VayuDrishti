@@ -212,59 +212,67 @@ rag_service = ChromaRAG()
 # Main AI response generation function
 async def generate_rag_response(question: str) -> Dict[str, Any]:
     """
-    Search vector DB for context and query Gemini 1.5 Flash to write an answer.
+    Search the vector DB for context and answer via Gemini — cached-first so the
+    demo never stalls on a rate limit, with a deterministic snippet fallback.
     """
+    from backend.services.llm_cache import llm_cache
+
     # 1. Retrieve matching chunks
     contexts = rag_service.query(question, top_k=4)
-    
+
     if not contexts:
         return {
             "answer": "I could not find any relevant regulations in the loaded CPCB documents to answer this question. Please verify if the files are loaded.",
-            "sources": []
+            "sources": [],
+            "provenance": "none",
         }
-        
+
     context_text = "\n\n".join([f"SOURCE: {c['source']}\n{c['text']}" for c in contexts])
-    
-    # 2. Call Gemini if API Key is configured
+    sources = list(set([c["source"] for c in contexts]))
+
+    # 2. Cached-first Gemini answer. The cache key is the question + retrieved
+    # source set, so an identical question served twice never re-spends quota.
+    async def _call_gemini():
+        from google import genai
+        import asyncio
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        prompt = f"""
+        You are VayuDrishti's regulatory assistant. You answer questions about Indian air quality policies, CPCB standards, and the National Clean Air Programme (NCAP) using ONLY the provided regulatory context.
+
+        User Question: {question}
+
+        Regulatory Context:
+        {context_text}
+
+        Instructions:
+        - Answer the question accurately based on the provided context.
+        - Cite which document (e.g. NCAP GUIDELINES or NAAQS STANDARDS) the information comes from in your sentences.
+        - Keep your response professional, precise, and within 3-4 sentences.
+        - If the context doesn't contain the answer, say "I cannot find this information in the CPCB standards." and do not guess.
+        """
+        response = await asyncio.to_thread(
+            client.models.generate_content, model="gemini-flash-latest", contents=prompt
+        )
+        return {"answer": response.text.strip(), "sources": sources}
+
     if settings.GEMINI_API_KEY:
         try:
-            from google import genai
-            client = genai.Client(api_key=settings.GEMINI_API_KEY)
-
-            prompt = f"""
-            You are VayuDrishti's regulatory assistant. You answer questions about Indian air quality policies, CPCB standards, and the National Clean Air Programme (NCAP) using ONLY the provided regulatory context.
-            
-            User Question: {question}
-            
-            Regulatory Context:
-            {context_text}
-            
-            Instructions:
-            - Answer the question accurately based on the provided context.
-            - Cite which document (e.g. NCAP GUIDELINES or NAAQS STANDARDS) the information comes from in your sentences.
-            - Keep your response professional, precise, and within 3-4 sentences.
-            - If the context doesn't contain the answer, say "I cannot find this information in the CPCB standards." and do not guess.
-            """
-            
-            # Run LLM call in a separate thread to prevent blocking the async loop
-            import asyncio
-            response = await asyncio.to_thread(
-                client.models.generate_content, model="gemini-flash-latest", contents=prompt
+            cached = await llm_cache.get_or_generate(
+                "rag_chat", {"q": question.strip().lower(), "src": sorted(sources)}, _call_gemini
             )
-            answer = response.text.strip()
-            
-            return {
-                "answer": answer,
-                "sources": list(set([c["source"] for c in contexts]))
-            }
+            if cached["result"]:
+                return {
+                    **cached["result"],
+                    "provenance": cached["source"],   # cached | live
+                    "cached_at": cached.get("cached_at"),
+                }
         except Exception as e:
             print(f"Error calling Gemini in RAG: {e}. Using snippet fallback.")
-            
-    # 3. Fallback: return the best snippet text directly if Gemini is unavailable
+
+    # 3. Deterministic fallback: return the best snippet directly.
     best_match = contexts[0]
-    answer = f"According to the {best_match['source']} guidelines:\n\n{best_match['text']}"
-    
     return {
-        "answer": answer,
-        "sources": list(set([c["source"] for c in contexts]))
+        "answer": f"According to the {best_match['source']} guidelines:\n\n{best_match['text']}",
+        "sources": sources,
+        "provenance": "retrieval-only",
     }
