@@ -31,6 +31,10 @@ def calculate_indian_aqi(pm25: float, pm10: float, no2: float, so2: float, o3: f
     
     def get_sub_index(val: float, breakpoints: List[float], index_bounds: List[int]) -> float:
         if val <= breakpoints[0]:
+            # breakpoints[0] is always 0 in every table below, so this branch only
+            # covers val <= 0 - guard the division instead of crashing on 0/0.
+            if breakpoints[0] == 0:
+                return 0.0
             return val * index_bounds[0] / breakpoints[0]
         for i in range(1, len(breakpoints)):
             if val <= breakpoints[i]:
@@ -45,17 +49,58 @@ def calculate_indian_aqi(pm25: float, pm10: float, no2: float, so2: float, o3: f
 
     # NAQI breakpoints categories: Good (50), Satisfactory (100), Moderate (200), Poor (300), Very Poor (400), Severe (500)
     naqi_bounds = [0, 50, 100, 200, 300, 400, 500]
-    
+
     pm25_idx = get_sub_index(pm25, [0, 30, 60, 90, 120, 250, 500], naqi_bounds)
     pm10_idx = get_sub_index(pm10, [0, 50, 100, 250, 350, 430, 600], naqi_bounds)
     no2_idx = get_sub_index(no2, [0, 40, 80, 180, 280, 400, 600], naqi_bounds)
     so2_idx = get_sub_index(so2, [0, 40, 80, 380, 800, 1600, 2000], naqi_bounds)
     o3_idx = get_sub_index(o3, [0, 50, 100, 168, 208, 748, 1000], naqi_bounds)
     co_idx = get_sub_index(co, [0, 1, 2, 10, 17, 34, 50], naqi_bounds)
-    
+
     # NAQI is the maximum of individual sub-indices
     # CPCB requires at least 3 parameters (one must be PM2.5 or PM10) to calculate NAQI
     return int(max(pm25_idx, pm10_idx, no2_idx, so2_idx, o3_idx, co_idx))
+
+# CPCB sub-index breakpoint tables, shared with calculate_indian_aqi above, exposed here so
+# AQICN's per-pollutant index readings (iaqi) can be inverted back into concentrations
+# on the SAME scale calculate_indian_aqi expects. AQICN's iaqi.*.v values are AQI sub-index
+# numbers (0-500), not raw ug/m3 concentrations -- feeding them straight into
+# calculate_indian_aqi as if they were concentrations silently produced wrong AQI/pollutant
+# values whenever the AQICN key was live.
+_NAQI_BOUNDS = [0, 50, 100, 200, 300, 400, 500]
+_CPCB_BREAKPOINTS = {
+    "pm25": [0, 30, 60, 90, 120, 250, 500],
+    "pm10": [0, 50, 100, 250, 350, 430, 600],
+    "no2": [0, 40, 80, 180, 280, 400, 600],
+    "so2": [0, 40, 80, 380, 800, 1600, 2000],
+    "o3": [0, 50, 100, 168, 208, 748, 1000],
+    "co": [0, 1, 2, 10, 17, 34, 50],
+}
+
+def sub_index_to_concentration(pollutant: str, index_value: float) -> float:
+    """
+    Invert a 0-500 AQI sub-index value back into an approximate raw concentration,
+    using the same CPCB breakpoint table calculate_indian_aqi() uses going forward.
+    This keeps AQICN-sourced readings dimensionally consistent with our own AQI math
+    instead of treating an index number as if it were a concentration.
+    """
+    breakpoints = _CPCB_BREAKPOINTS.get(pollutant)
+    if not breakpoints or index_value is None:
+        return 0.0
+    bounds = _NAQI_BOUNDS
+    if index_value <= bounds[0]:
+        return 0.0
+    for i in range(1, len(bounds)):
+        if index_value <= bounds[i]:
+            x0, x1 = breakpoints[i-1], breakpoints[i]
+            y0, y1 = bounds[i-1], bounds[i]
+            if y1 == y0:
+                return x0
+            return x0 + (index_value - y0) * (x1 - x0) / (y1 - y0)
+    # Overflow beyond 500 - extrapolate off the last segment
+    x0, x1 = breakpoints[-2], breakpoints[-1]
+    y0, y1 = bounds[-2], bounds[-1]
+    return x0 + (index_value - y0) * (x1 - x0) / (y1 - y0)
 
 def generate_simulated_readings(station: Dict[str, Any], timestamp: datetime) -> Dict[str, Any]:
     """
@@ -149,6 +194,7 @@ def generate_simulated_readings(station: Dict[str, Any], timestamp: datetime) ->
     humidity = 60.0
     wind_spd = 8.0
     wind_dir = 180.0
+    precipitation = 0.0
     
     if city == "delhi" or city == "lucknow":
         temp = 38.0 - abs(hour - 14) * 0.8
@@ -165,9 +211,15 @@ def generate_simulated_readings(station: Dict[str, Any], timestamp: datetime) ->
         humidity = 65.0 - abs(hour - 14) * 1.0
         wind_spd = 10.0 + random.uniform(0, 5)
         wind_dir = 90.0 + random.uniform(-40, 40)
-        
+
+    # High-humidity conditions carry a chance of rain, which washes out particulates
+    if humidity > 75 and random.random() < 0.25:
+        precipitation = round(random.uniform(0.2, 8.0), 1)
+        pm25 *= 0.7
+        pm10 *= 0.7
+
     aqi = calculate_indian_aqi(pm25, pm10, no2, so2, o3, co)
-    
+
     return {
         "station_id": station_id,
         "city": city,
@@ -183,6 +235,7 @@ def generate_simulated_readings(station: Dict[str, Any], timestamp: datetime) ->
         "humidity": round(humidity, 1),
         "wind_speed": round(wind_spd, 1),
         "wind_direction": int(wind_dir) % 360,
+        "precipitation": precipitation,
         "source": "simulated"
     }
 
@@ -223,15 +276,18 @@ async def fetch_aqicn_aqi(station_name: str) -> Dict[str, Any]:
                 if body.get("status") == "ok":
                     data = body.get("data", {})
                     iaqi = data.get("iaqi", {})
-                    
-                    # Convert AQICN EPA standard reading to rough concentration values
-                    pm25 = iaqi.get("pm25", {}).get("v", 0.0)
-                    pm10 = iaqi.get("pm10", {}).get("v", 0.0)
-                    no2 = iaqi.get("no2", {}).get("v", 0.0)
-                    so2 = iaqi.get("so2", {}).get("v", 0.0)
-                    o3 = iaqi.get("o3", {}).get("v", 0.0)
-                    co = iaqi.get("co", {}).get("v", 0.0)
-                    
+
+                    # AQICN's iaqi.*.v values are AQI sub-index numbers (0-500), NOT raw
+                    # ug/m3 concentrations. Invert each through the CPCB breakpoint table so
+                    # what we store downstream is dimensionally consistent with
+                    # calculate_indian_aqi()'s expectations.
+                    pm25 = sub_index_to_concentration("pm25", iaqi.get("pm25", {}).get("v"))
+                    pm10 = sub_index_to_concentration("pm10", iaqi.get("pm10", {}).get("v"))
+                    no2 = sub_index_to_concentration("no2", iaqi.get("no2", {}).get("v"))
+                    so2 = sub_index_to_concentration("so2", iaqi.get("so2", {}).get("v"))
+                    o3 = sub_index_to_concentration("o3", iaqi.get("o3", {}).get("v"))
+                    co = sub_index_to_concentration("co", iaqi.get("co", {}).get("v"))
+
                     return {
                         "aqi_source": data.get("aqi"),
                         "pm25": pm25,
@@ -243,6 +299,33 @@ async def fetch_aqicn_aqi(station_name: str) -> Dict[str, Any]:
                     }
     except Exception as e:
         print(f"Error fetching AQICN AQI: {e}")
+    return {}
+
+async def fetch_openweathermap_aqi(lat: float, lon: float) -> Dict[str, Any]:
+    """
+    Fetch air pollution data from OpenWeatherMap API.
+    """
+    if not getattr(settings, "OPENWEATHERMAP_API_KEY", None):
+        return {}
+        
+    url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={settings.OPENWEATHERMAP_API_KEY}"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                body = resp.json()
+                if "list" in body and len(body["list"]) > 0:
+                    components = body["list"][0].get("components", {})
+                    return {
+                        "pm25": components.get("pm2_5", 0.0),
+                        "pm10": components.get("pm10", 0.0),
+                        "no2": components.get("no2", 0.0),
+                        "so2": components.get("so2", 0.0),
+                        "o3": components.get("o3", 0.0),
+                        "co": components.get("co", 0.0)
+                    }
+    except Exception as e:
+        print(f"Error fetching OpenWeatherMap AQI: {e}")
     return {}
 
 async def ingest_live_data_for_station(station: Dict[str, Any]) -> Dict[str, Any]:
@@ -262,10 +345,12 @@ async def ingest_live_data_for_station(station: Dict[str, Any]) -> Dict[str, Any
     
     # 2. Fetch AQI data
     aqi_data = {}
-    if settings.AQICN_API_KEY:
+    if getattr(settings, "AQICN_API_KEY", None):
         # Try station name search keyword
         search_keyword = station["name"].split(",")[0]
         aqi_data = await fetch_aqicn_aqi(search_keyword)
+    elif getattr(settings, "OPENWEATHERMAP_API_KEY", None):
+        aqi_data = await fetch_openweathermap_aqi(lat, lon)
         
     # 3. Merge or fallback
     if aqi_data:
@@ -284,7 +369,8 @@ async def ingest_live_data_for_station(station: Dict[str, Any]) -> Dict[str, Any
         hum = weather_data.get("humidity") or random.uniform(40.0, 80.0)
         w_spd = weather_data.get("wind_speed") or random.uniform(2.0, 12.0)
         w_dir = weather_data.get("wind_direction") or random.randint(0, 359)
-        
+        precip = weather_data.get("precipitation") or 0.0
+
         reading = {
             "station_id": station_id,
             "city": city,
@@ -300,6 +386,7 @@ async def ingest_live_data_for_station(station: Dict[str, Any]) -> Dict[str, Any
             "humidity": round(hum, 1),
             "wind_speed": round(w_spd, 1),
             "wind_direction": int(w_dir),
+            "precipitation": round(precip, 1),
             "source": "api"
         }
     else:
@@ -311,6 +398,7 @@ async def ingest_live_data_for_station(station: Dict[str, Any]) -> Dict[str, Any
             reading["humidity"] = weather_data["humidity"]
             reading["wind_speed"] = weather_data["wind_speed"]
             reading["wind_direction"] = weather_data["wind_direction"]
+            reading["precipitation"] = weather_data.get("precipitation") or 0.0
             # Recalculate AQI just in case
             reading["aqi"] = calculate_indian_aqi(
                 reading["pm25"], reading["pm10"], reading["no2"], reading["so2"], reading["o3"], reading["co"]

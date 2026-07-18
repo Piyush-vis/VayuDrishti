@@ -36,6 +36,7 @@ class AQIReadingBase(BaseModel):
     humidity: Optional[float] = None
     wind_speed: Optional[float] = None
     wind_direction: Optional[float] = None
+    precipitation: Optional[float] = None
     source: str = "openweathermap"
 
 class AQIReadingCreate(AQIReadingBase):

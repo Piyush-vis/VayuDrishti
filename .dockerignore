@@ -1,0 +1,18 @@
+# Keep the Docker build context small - without this, `docker compose build` sends the
+# entire repo (including venv/node_modules/.git, which can be gigabytes) to the daemon
+# on every build.
+.git
+.gitignore
+
+backend/venv
+backend/__pycache__
+backend/**/__pycache__
+backend/data/chroma_db
+backend/.env
+
+frontend/node_modules
+frontend/dist
+frontend/.env
+
+**/*.pyc
+.DS_Store

@@ -36,6 +36,10 @@ class MockCursor:
     async def to_list(self, length=None):
         return self.items[:length] if length else self.items
 
+class MockInsertOneResult:
+    def __init__(self, inserted_id):
+        self.inserted_id = inserted_id
+
 class MockCollection:
     def __init__(self, name):
         self.name = name
@@ -49,10 +53,24 @@ class MockCollection:
             for item in self.data:
                 match = True
                 for k, v in query.items():
+                    item_val = item.get(k)
                     if isinstance(v, dict):
-                        # skip complex filters or simple range queries
-                        continue
-                    if item.get(k) != v:
+                        for op, op_val in v.items():
+                            if op == "$in":
+                                if item_val not in op_val:
+                                    match = False
+                                    break
+                            elif op == "$gte":
+                                if item_val is None or item_val < op_val:
+                                    match = False
+                                    break
+                            elif op == "$lte":
+                                if item_val is None or item_val > op_val:
+                                    match = False
+                                    break
+                        if not match:
+                            break
+                    elif item_val != v:
                         match = False
                         break
                 if match:
@@ -81,7 +99,7 @@ class MockCollection:
         if "_id" not in doc:
             doc["_id"] = f"mock_id_{self.name}_{len(self.data)}"
         self.data.append(doc)
-        return doc
+        return MockInsertOneResult(doc["_id"])
 
     async def update_one(self, query, update, upsert=False):
         # Mock simple update/upsert for compliance marking

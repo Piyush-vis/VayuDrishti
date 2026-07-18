@@ -182,23 +182,67 @@ class EnforcementService:
         Retrieve a single action detail.
         """
         try:
-            a = await db_helper.enforcement_actions.find_one({"_id": ObjectId(action_id)})
+            try:
+                oid = ObjectId(action_id)
+            except Exception:
+                oid = action_id
+            a = await db_helper.enforcement_actions.find_one({"_id": oid})
             if a:
                 a["_id"] = str(a["_id"])
             return a
         except Exception:
             return None
 
+    async def get_ai_analysis(self, action_id: str) -> Dict[str, Any]:
+        """
+        Run the Compound Risk Enforcement Intelligence Agent (backend/services/agents.py)
+        against an already-detected rule-based breach. The agent independently
+        cross-references source attribution and forecast trend data via tools to judge
+        whether this is a genuine compound risk situation, then caches its verdict on
+        the action document so repeat requests don't re-spend an LLM call.
+        """
+        action = await self.get_action_by_id(action_id)
+        if not action:
+            raise ValueError(f"Enforcement action {action_id} not found.")
+
+        if action.get("ai_analysis"):
+            return action
+
+        from backend.services.agents import analyze_enforcement_action
+        analysis = await analyze_enforcement_action(action)
+        if analysis is None:
+            raise RuntimeError(
+                "AI compound-risk analysis is unavailable (no GEMINI_API_KEY configured, "
+                "or the agent call failed)."
+            )
+
+        try:
+            oid = ObjectId(action_id)
+        except Exception:
+            oid = action_id
+        await db_helper.enforcement_actions.update_one(
+            {"_id": oid},
+            {"$set": {"ai_analysis": analysis}}
+        )
+        action["ai_analysis"] = analysis
+        return action
+
     async def update_action_status(self, action_id: str, status: str) -> bool:
         """
         Update the status of an enforcement action (pending, assigned, resolved).
         """
         try:
+            try:
+                oid = ObjectId(action_id)
+            except Exception:
+                oid = action_id
             res = await db_helper.enforcement_actions.update_one(
-                {"_id": ObjectId(action_id)},
+                {"_id": oid},
                 {"$set": {"status": status}}
             )
-            return res.modified_count > 0
+            if hasattr(res, 'modified_count'):
+                return res.modified_count > 0
+            return res is not None
         except Exception:
             return False
 

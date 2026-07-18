@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mongodb:
     image: mongo:7
@@ -12,11 +10,18 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: vayudrishti-backend
     ports:
       - "8000:8000"
+    # Reads API keys (GEMINI_API_KEY, AQICN_API_KEY, etc.) from backend/.env - the same
+    # file the README's manual setup instructions ask you to create. The explicit
+    # `environment:` overrides below win over env_file, so Mongo/CORS are still
+    # correctly repointed at the container network regardless of what's in that file.
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
       - MONGODB_URI=mongodb://mongodb:27017
       - DATABASE_NAME=vayudrishti

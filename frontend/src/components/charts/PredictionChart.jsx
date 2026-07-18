@@ -17,13 +17,19 @@ const PredictionChart = ({ data }) => {
     const hourLabel = formatTime(item.timestamp);
     const dayLabel = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
     
+    const low = Math.round(item.confidence_low);
+    const high = Math.round(item.confidence_high);
+
     return {
       ...item,
       label: `${dayLabel} ${hourLabel}`,
-      // Recharts Area expects high and low as arrays or we can use confidence_high and base confidence_low
       displayAqi: Math.round(item.aqi),
-      low: Math.round(item.confidence_low),
-      high: Math.round(item.confidence_high)
+      low,
+      high,
+      // Recharts has no "band between two values" primitive. The standard trick is a
+      // stacked area: an invisible area up to `low`, then a visible area of height
+      // `band` on top of it - together the visible fill spans exactly [low, high].
+      band: Math.max(0, high - low)
     };
   });
 
@@ -49,16 +55,38 @@ const PredictionChart = ({ data }) => {
             contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }}
             labelStyle={{ color: '#94a3b8', fontSize: '10px', fontWeight: 'bold' }}
             itemStyle={{ color: '#fff', fontSize: '12px' }}
+            content={({ active, payload, label }) => {
+              if (!active || !payload || !payload.length) return null;
+              const point = payload[0]?.payload;
+              if (!point) return null;
+              return (
+                <div style={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px', padding: '8px 10px' }}>
+                  <p style={{ color: '#94a3b8', fontSize: '10px', fontWeight: 'bold', margin: 0 }}>{label}</p>
+                  <p style={{ color: '#3b82f6', fontSize: '12px', margin: '4px 0 0' }}>Predicted AQI: {point.displayAqi}</p>
+                  <p style={{ color: '#94a3b8', fontSize: '11px', margin: '2px 0 0' }}>80% Confidence: {point.low} - {point.high}</p>
+                </div>
+              );
+            }}
           />
           
-          {/* Confidence interval area range */}
-          <Area 
-            type="monotone" 
-            dataKey="high" 
+          {/* Invisible base lifting the visible band up to the "low" bound */}
+          <Area
+            type="monotone"
+            dataKey="low"
+            stackId="confidence"
             stroke="none"
-            fill="#3b82f6" 
-            fillOpacity={0.12} 
-            baseValue="low" // This creates the range band!
+            fill="transparent"
+            legendType="none"
+            name="Confidence Low"
+          />
+          {/* Visible band: stacked on top of "low", so it spans exactly [low, high] */}
+          <Area
+            type="monotone"
+            dataKey="band"
+            stackId="confidence"
+            stroke="none"
+            fill="#3b82f6"
+            fillOpacity={0.15}
             name="80% Confidence Range"
           />
 

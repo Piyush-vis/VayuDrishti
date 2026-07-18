@@ -1,14 +1,22 @@
 import json
-from datetime import datetime
+import asyncio
+from datetime import datetime, timedelta
 from typing import Dict, Any, List
-import google.generativeai as genai
+from google import genai
 from backend.config import settings
 from backend.models.database import db_helper
 from backend.services.data_ingestion import CITIES_COORDS
 
-# Configure Google Gemini
-if settings.GEMINI_API_KEY:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
+# google.generativeai is deprecated in favor of the unified google-genai SDK (already
+# an installed dependency via langchain-google-genai) - a lazily-created client avoids
+# constructing one when no API key is configured.
+_gemini_client = None
+
+def _get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None and settings.GEMINI_API_KEY:
+        _gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    return _gemini_client
 
 # Comprehensive local template warnings for multi-language fallback
 LOCAL_ADVISORY_TEMPLATES = {
@@ -218,7 +226,6 @@ class AdvisoryService:
         category = self.get_aqi_category(avg_aqi)
         
         # Check if recent advisory already exists in DB
-        cutoff = datetime.utcnow() - datetime.utcfromtimestamp(0)
         exists = await db_helper.citizen_advisories.find_one(
             {"city": city.lower(), "zone": zone},
             sort=[("generated_at", -1)]
@@ -232,14 +239,24 @@ class AdvisoryService:
         # Compile advisory payload
         advisories = {}
         
-        # Try to generate using Gemini if key is provided
+        # Try the tool-calling Citizen Advisory Agent first (it can look up nearby
+        # vulnerable locations itself for severe conditions), then the raw single-shot
+        # Gemini prompt, then static templates - each a strictly more resilient fallback.
+        advisories = None
         if settings.GEMINI_API_KEY:
             try:
-                advisories = await self._generate_gemini_advisory(city, zone, avg_aqi, category, pollutants_list)
+                from backend.services.agents import generate_citizen_advisory_agentic
+                advisories = await generate_citizen_advisory_agentic(city, zone, avg_aqi, category, pollutants_list)
             except Exception as e:
-                print(f"Gemini advisory generation failed: {e}. Falling back to templates.")
-                advisories = LOCAL_ADVISORY_TEMPLATES[category]
-        else:
+                print(f"Citizen Advisory Agent failed: {e}. Falling back to single-shot Gemini prompt.")
+
+            if not advisories:
+                try:
+                    advisories = await self._generate_gemini_advisory(city, zone, avg_aqi, category, pollutants_list)
+                except Exception as e:
+                    print(f"Gemini advisory generation failed: {e}. Falling back to templates.")
+
+        if not advisories:
             advisories = LOCAL_ADVISORY_TEMPLATES[category]
             
         payload = {
@@ -260,8 +277,8 @@ class AdvisoryService:
         """
         Use Gemini 1.5 Flash to generate localized, multi-language health advisories in JSON.
         """
-        model = genai.GenerativeModel("gemini-flash-latest")
-        
+        client = _get_gemini_client()
+
         prompt = f"""
         You are an advanced air quality health advisory system for Indian cities.
         
@@ -302,7 +319,9 @@ class AdvisoryService:
         Do not include markdown tags, code blocks, or triple backticks in your output. Just output the raw JSON string.
         """
         
-        response = await asyncio.to_thread(model.generate_content, prompt)
+        response = await asyncio.to_thread(
+            client.models.generate_content, model="gemini-flash-latest", contents=prompt
+        )
         text = response.text.strip()
         
         # Clean up any potential markdown wraps

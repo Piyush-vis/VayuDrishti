@@ -18,8 +18,10 @@ async def lifespan(app: FastAPI):
     # Startup tasks
     print("VayuDrishti API Starting Up...")
     from backend.models.database import db_helper, seed_database
+    from backend.services.scheduler import start_scheduler
     db_helper.connect()
     await seed_database()
+    start_scheduler()
     yield
     # Shutdown tasks
     print("VayuDrishti API Shutting Down...")

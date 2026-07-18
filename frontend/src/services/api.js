@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -17,6 +17,7 @@ export const stationsApi = {
 
 export const aqiApi = {
   current: (city) => apiClient.get(`/aqi/current?city=${city}`).then(r => r.data),
+  at: (city, hoursAgo) => apiClient.get(`/aqi/at?city=${city}&hours_ago=${hoursAgo}`).then(r => r.data),
   history: (id, start, end) => apiClient.get(`/aqi/history?station_id=${id}&start=${start}&end=${end}`).then(r => r.data),
   heatmap: (city) => apiClient.get(`/aqi/heatmap?city=${city}`).then(r => r.data),
   compare: (cities) => apiClient.get(`/aqi/compare?cities=${cities}`).then(r => r.data),
@@ -38,6 +39,7 @@ export const enforcementApi = {
   actions: (city) => apiClient.get(`/enforcement/actions?city=${city}`).then(r => r.data),
   get: (id) => apiClient.get(`/enforcement/actions/${id}`).then(r => r.data),
   update: (id, status) => apiClient.patch(`/enforcement/actions/${id}?status=${status}`).then(r => r.data),
+  analyze: (id) => apiClient.post(`/enforcement/actions/${id}/analyze`).then(r => r.data),
 };
 
 export const advisoryApi = {

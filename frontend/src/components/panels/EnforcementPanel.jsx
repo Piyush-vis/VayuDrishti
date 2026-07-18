@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { enforcementApi } from '../../services/api';
-import { ShieldCheck, Clock, AlertTriangle, PlayCircle } from 'lucide-react';
+import { ShieldCheck, Clock, AlertTriangle, PlayCircle, Sparkles, Loader2 } from 'lucide-react';
 import { formatDateTime } from '../../utils/formatters';
+import LoadingSpinner from '../common/LoadingSpinner';
 
 const EnforcementPanel = ({ city, onRefresh }) => {
   const [actions, setActions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [analyzingId, setAnalyzingId] = useState(null);
+  const [analysisError, setAnalysisError] = useState({});
 
   const fetchActions = async () => {
     setLoading(true);
@@ -35,6 +38,19 @@ const EnforcementPanel = ({ city, onRefresh }) => {
       if (onRefresh) onRefresh();
     } catch (e) {
       alert("Failed to update status: " + e.message);
+    }
+  };
+
+  const handleAnalyze = async (id) => {
+    setAnalyzingId(id);
+    setAnalysisError((prev) => ({ ...prev, [id]: null }));
+    try {
+      const updated = await enforcementApi.analyze(id);
+      setActions((prev) => prev.map((a) => (a._id === id ? updated : a)));
+    } catch (e) {
+      setAnalysisError((prev) => ({ ...prev, [id]: e.response?.data?.detail || 'AI analysis unavailable.' }));
+    } finally {
+      setAnalyzingId(null);
     }
   };
 
@@ -68,7 +84,12 @@ const EnforcementPanel = ({ city, onRefresh }) => {
   };
 
   if (loading && actions.length === 0) {
-    return <div className="text-center p-4 text-xs text-slate-500">Scanning for violations...</div>;
+    return (
+      <div className="flex flex-col items-center gap-3 p-8 text-xs text-slate-500">
+        <LoadingSpinner size="medium" />
+        <span>Scanning for violations...</span>
+      </div>
+    );
   }
 
   return (
@@ -122,6 +143,57 @@ const EnforcementPanel = ({ city, onRefresh }) => {
                   </span>
                 </div>
               </div>
+
+              {/* AI Compound Risk Analysis */}
+              {action.ai_analysis ? (
+                <div className={`p-2.5 rounded-lg border text-[10px] space-y-1.5 ${
+                  action.ai_analysis.compound_risk
+                    ? 'bg-red-500/10 border-red-500/30'
+                    : 'bg-slate-900/50 border-slate-800/80'
+                }`}>
+                  <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider">
+                    <Sparkles className="h-3 w-3 text-blue-400" />
+                    <span className={action.ai_analysis.compound_risk ? 'text-red-400' : 'text-slate-300'}>
+                      AI Compound Risk: {action.ai_analysis.compound_risk ? 'Confirmed' : 'Not Confirmed'}
+                    </span>
+                    <span className="text-slate-500 font-normal normal-case">
+                      ({Math.round((action.ai_analysis.confidence || 0) * 100)}% confidence)
+                    </span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">{action.ai_analysis.rationale}</p>
+                  {action.ai_analysis.regulatory_basis && (
+                    <p className="text-slate-500 italic">Basis: {action.ai_analysis.regulatory_basis}</p>
+                  )}
+                  {action.ai_analysis.recommended_escalation && (
+                    <p className="text-blue-300 font-medium">→ {action.ai_analysis.recommended_escalation}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    onClick={() => handleAnalyze(action._id)}
+                    disabled={analyzingId === action._id}
+                    className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-lg border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 transition-all active:scale-95 disabled:opacity-60"
+                  >
+                    {analyzingId === action._id ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Analyzing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5" />
+                        <span>Run AI Compound-Risk Analysis</span>
+                      </>
+                    )}
+                  </button>
+                  {analysisError[action._id] && (
+                    <span className="text-[9px] text-red-400 max-w-[160px] truncate" title={analysisError[action._id]}>
+                      {analysisError[action._id]}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* Dispatch controls */}
               {action.status !== 'resolved' && (

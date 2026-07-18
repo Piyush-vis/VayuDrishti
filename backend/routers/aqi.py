@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query, HTTPException
 from backend.models.database import db_helper
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 router = APIRouter(prefix="/aqi", tags=["aqi"])
@@ -40,16 +40,68 @@ async def get_current_aqi(city: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/at")
+async def get_aqi_at_time(city: str, hours_ago: int = Query(0, ge=0, le=168)):
+    """
+    Get, for every active station in a city, the real recorded reading closest to
+    (now - hours_ago hours). Powers the map's historical timelapse slider with actual
+    stored readings instead of a synthetic approximation.
+    """
+    try:
+        target_time = datetime.utcnow().replace(minute=0, second=0, microsecond=0) - timedelta(hours=hours_ago)
+
+        cursor = db_helper.stations.find({"city": city.lower(), "active": True})
+        stations = await cursor.to_list(length=100)
+
+        results = []
+        for station in stations:
+            station_id = station["station_id"]
+            if hours_ago == 0:
+                reading = await db_helper.aqi_readings.find_one(
+                    {"station_id": station_id},
+                    sort=[("timestamp", -1)]
+                )
+            else:
+                # Closest reading at or before the target hour, falling back to the
+                # closest one after it if no earlier record exists.
+                reading = await db_helper.aqi_readings.find_one(
+                    {"station_id": station_id, "timestamp": {"$lte": target_time}},
+                    sort=[("timestamp", -1)]
+                )
+                if not reading:
+                    reading = await db_helper.aqi_readings.find_one(
+                        {"station_id": station_id, "timestamp": {"$gte": target_time}},
+                        sort=[("timestamp", 1)]
+                    )
+
+            if reading:
+                reading["_id"] = str(reading["_id"])
+                results.append({
+                    "station": {
+                        "station_id": station["station_id"],
+                        "name": station["name"],
+                        "latitude": station["latitude"],
+                        "longitude": station["longitude"],
+                        "zone": station["zone"]
+                    },
+                    "reading": reading
+                })
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/history")
 async def get_historical_aqi(station_id: str, start: str, end: str):
     """
     Get historical AQI readings for a station between two date strings (ISO format).
     """
     try:
-        # Parse ISO dates
+        # Parse ISO dates. All stored reading timestamps are naive UTC (datetime.utcnow()),
+        # so strip any parsed timezone info to avoid "can't compare offset-naive and
+        # offset-aware datetimes" when the caller passes a "Z"-suffixed timestamp.
         try:
-            start_date = datetime.fromisoformat(start.replace("Z", "+00:00"))
-            end_date = datetime.fromisoformat(end.replace("Z", "+00:00"))
+            start_date = datetime.fromisoformat(start.replace("Z", "+00:00")).replace(tzinfo=None)
+            end_date = datetime.fromisoformat(end.replace("Z", "+00:00")).replace(tzinfo=None)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format. Use ISO format (e.g. YYYY-MM-DDTHH:MM:SSZ)")
             

@@ -228,9 +228,9 @@ async def generate_rag_response(question: str) -> Dict[str, Any]:
     # 2. Call Gemini if API Key is configured
     if settings.GEMINI_API_KEY:
         try:
-            import google.generativeai as genai
-            model = genai.GenerativeModel("gemini-flash-latest")
-            
+            from google import genai
+            client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
             prompt = f"""
             You are VayuDrishti's regulatory assistant. You answer questions about Indian air quality policies, CPCB standards, and the National Clean Air Programme (NCAP) using ONLY the provided regulatory context.
             
@@ -248,7 +248,9 @@ async def generate_rag_response(question: str) -> Dict[str, Any]:
             
             # Run LLM call in a separate thread to prevent blocking the async loop
             import asyncio
-            response = await asyncio.to_thread(model.generate_content, prompt)
+            response = await asyncio.to_thread(
+                client.models.generate_content, model="gemini-flash-latest", contents=prompt
+            )
             answer = response.text.strip()
             
             return {

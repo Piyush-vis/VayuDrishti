@@ -24,6 +24,24 @@ async def get_action(action_id: str):
         raise HTTPException(status_code=404, detail=f"Enforcement action {action_id} not found.")
     return action
 
+@router.post("/actions/{action_id}/analyze")
+async def analyze_action(action_id: str):
+    """
+    Run the Compound Risk Enforcement Intelligence Agent against a rule-detected
+    breach. The agent uses tools to independently check source attribution and the
+    station's forecast trend before judging whether this is a genuine compound risk
+    situation, grounding its recommendation in regulatory context where possible.
+    """
+    try:
+        result = await enforcement_service.get_ai_analysis(action_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.patch("/actions/{action_id}")
 async def update_action(action_id: str, status: str = Query(..., description="Action status: pending, assigned, resolved")):
     """

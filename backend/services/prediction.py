@@ -29,15 +29,17 @@ class PredictionService:
                 self.model_loaded = True
                 print(f"XGBoost model loaded successfully from {MODEL_PATH}.")
             else:
-                print("XGBoost model file not found. Attempting to train on startup...")
-                from backend.ml.train_model import train_and_save_model
-                self.rmse = train_and_save_model()
-                self.model = joblib.load(MODEL_PATH)
-                self.metadata = joblib.load(METADATA_PATH)
-                self.model_loaded = True
-                print("XGBoost model trained and loaded successfully.")
+                # Training needs a stable, chronologically-ordered dataset pulled from
+                # the database (or a bootstrapped simulator run) - it is run offline via
+                # `python -m backend.ml.train_model`, not automatically here. This runs
+                # at prediction_service import time, before the app's DB connection/mock
+                # fallback is even established, so attempting an async training pull here
+                # would be unreliable. The statistical fallback forecaster covers this case.
+                print("XGBoost model file not found. Run `python -m backend.ml.train_model` "
+                      "to train one. Using statistical fallback forecaster for now.")
+                self.model_loaded = False
         except Exception as e:
-            print(f"Warning: Failed to load/train XGBoost model: {e}. Using statistical fallback forecaster.")
+            print(f"Warning: Failed to load XGBoost model: {e}. Using statistical fallback forecaster.")
             self.model_loaded = False
 
     def generate_statistical_forecast(self, station: Dict[str, Any], last_readings: List[Dict[str, Any]], hours: int = 72) -> List[Dict[str, Any]]:
@@ -232,8 +234,14 @@ class PredictionService:
             "rmse": self.rmse
         }
         
+        # Note: motor's insert_one() mutates `payload` in place, adding a raw (non-JSON-
+        # serializable) ObjectId as "_id" - strip it before returning, since this
+        # response's schema doesn't expose an _id field. The in-memory mock DB used
+        # when MongoDB is unreachable deep-copies before inserting, so this only bites
+        # with a real MongoDB connection.
         await db_helper.predictions.insert_one(payload)
-        
+        payload.pop("_id", None)
+
         return payload
 
     async def get_alerts_for_city(self, city: str, threshold: float = 300.0) -> List[Dict[str, Any]]:
