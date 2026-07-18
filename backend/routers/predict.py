@@ -19,6 +19,17 @@ async def get_forecast(station_id: str, hours: int = Query(default=72), at: str 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/explain")
+async def explain_forecast(station_id: str, horizon: int = Query(default=24, ge=6, le=72), at: str = Query(default=None)):
+    """Exact TreeSHAP feature attribution for a station's forecast — the waterfall
+    of what pushed the prediction up or down."""
+    try:
+        return await prediction_service.explain_forecast(station_id, horizon=horizon, at=parse_at(at))
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/alerts")
 async def get_alerts(city: str, threshold: float = Query(default=300.0), at: str = Query(default=None)):
     """

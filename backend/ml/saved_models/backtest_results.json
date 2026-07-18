@@ -1,0 +1,29 @@
+{
+  "horizons": {
+    "24": {
+      "horizon_hours": 24,
+      "model_rmse": 13.83,
+      "persistence_rmse": 19.0,
+      "improvement_pct": 27.2,
+      "n_samples": 7800
+    },
+    "48": {
+      "horizon_hours": 48,
+      "model_rmse": 13.76,
+      "persistence_rmse": 19.22,
+      "improvement_pct": 28.4,
+      "n_samples": 7200
+    },
+    "72": {
+      "horizon_hours": 72,
+      "model_rmse": 13.78,
+      "persistence_rmse": 18.78,
+      "improvement_pct": 26.6,
+      "n_samples": 6600
+    }
+  },
+  "evaluated_at": "2026-07-19T04:51:32.354392",
+  "data_source": "physically_grounded_simulator_90d_holdout",
+  "method": "direct per-horizon XGBoost vs naive persistence (AQI now)",
+  "note": "Models frozen; direct multi-horizon evaluation of the production forecaster."
+}

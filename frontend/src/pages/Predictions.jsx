@@ -4,8 +4,9 @@ import { AlertTriangle } from 'lucide-react';
 import PredictionChart from '../components/charts/PredictionChart';
 import AlertCard from '../components/common/AlertCard';
 import ProvenanceBadge from '../components/common/ProvenanceBadge';
+import ShapWaterfall from '../components/charts/ShapWaterfall';
 
-function Predictions({ selectedStation, forecast, forecastMeta, alerts }) {
+function Predictions({ selectedStation, forecast, forecastMeta, explanation, alerts }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
@@ -60,6 +61,34 @@ function Predictions({ selectedStation, forecast, forecastMeta, alerts }) {
                   </div>
                 </div>
               </div>
+
+              {/* Multi-horizon skill vs persistence */}
+              {forecastMeta?.horizonMetrics && (
+                <div className="glass-card p-4 space-y-2 bg-slate-900/30">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Skill vs Persistence</h4>
+                  <div className="space-y-1">
+                    {['24', '48', '72'].filter(h => forecastMeta.horizonMetrics[h]).map((h) => {
+                      const m = forecastMeta.horizonMetrics[h];
+                      return (
+                        <div key={h} className="flex items-center justify-between text-[10px]">
+                          <span className="text-slate-400">H+{h}h</span>
+                          <span className="font-mono text-slate-300">RMSE {m.model_rmse} vs {m.persistence_rmse}</span>
+                          <span className="font-bold text-emerald-400">+{m.improvement_pct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[8px] text-slate-600">Direct per-horizon XGBoost, chronological holdout.</p>
+                </div>
+              )}
+
+              {/* SHAP explainability */}
+              {explanation?.available && (
+                <div className="glass-card p-4 space-y-2 bg-slate-900/30">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Why this forecast?</h4>
+                  <ShapWaterfall explanation={explanation} />
+                </div>
+              )}
               
               <div className="glass-card p-4 space-y-3 border-l-4 border-l-red-500 bg-red-950/10">
                 <div className="flex items-center gap-2 text-red-400">

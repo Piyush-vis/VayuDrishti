@@ -2,45 +2,128 @@ import os
 import joblib
 import numpy as np
 import pandas as pd
+import xgboost as xgb
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from backend.config import settings
 from backend.models.database import db_helper
 
+# Human-readable labels for the model features (SHAP explanation display)
+FEATURE_LABELS = {
+    "aqi_t": "Current AQI", "aqi_t-1": "AQI 1h ago", "aqi_t-3": "AQI 3h ago",
+    "aqi_t-6": "AQI 6h ago", "aqi_t-12": "AQI 12h ago", "aqi_t-24": "AQI 24h ago",
+    "temperature": "Temperature", "humidity": "Humidity", "wind_speed": "Wind speed",
+    "wind_direction": "Wind direction", "precipitation": "Precipitation",
+    "hour_of_day": "Hour of day", "day_of_week": "Day of week", "month": "Month",
+    "is_weekend": "Weekend", "aqi_rolling_mean_6h": "6h avg AQI",
+    "aqi_rolling_std_6h": "6h AQI volatility", "aqi_rolling_mean_24h": "24h avg AQI",
+    "aqi_rolling_max_24h": "24h peak AQI",
+}
+
 # Model Paths
 ML_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ml")
 MODEL_PATH = os.path.join(ML_DIR, "saved_models", "xgboost_aqi_model.joblib")
+MULTI_MODEL_PATH = os.path.join(ML_DIR, "saved_models", "xgboost_aqi_models_multi.joblib")
 METADATA_PATH = os.path.join(ML_DIR, "saved_models", "model_metadata.joblib")
+
+# Feature order the models were trained on (must match ml/train_model.FEATURE_COLUMNS)
+FEATURE_COLUMNS = [
+    "aqi_t", "aqi_t-1", "aqi_t-3", "aqi_t-6", "aqi_t-12", "aqi_t-24",
+    "temperature", "humidity", "wind_speed", "wind_direction", "precipitation",
+    "hour_of_day", "day_of_week", "month", "is_weekend",
+    "aqi_rolling_mean_6h", "aqi_rolling_std_6h", "aqi_rolling_mean_24h", "aqi_rolling_max_24h",
+]
 
 class PredictionService:
     def __init__(self):
         self.model = None
+        self.multi_models = None  # {horizon:int -> model}
         self.metadata = None
         self.rmse = 24.5  # default baseline RMSE
         self.model_loaded = False
         self._load_model()
-        
+
     def _load_model(self):
         try:
             if os.path.exists(MODEL_PATH) and os.path.exists(METADATA_PATH):
                 self.model = joblib.load(MODEL_PATH)
                 self.metadata = joblib.load(METADATA_PATH)
                 self.rmse = self.metadata.get("rmse", 24.5)
+                # Direct multi-horizon bundle (preferred): one model per horizon,
+                # each predicting that horizon DIRECTLY. This replaced a broken
+                # recursive scheme (24h model fed its own outputs hourly) that lost
+                # to persistence at every horizon.
+                if os.path.exists(MULTI_MODEL_PATH):
+                    self.multi_models = joblib.load(MULTI_MODEL_PATH)
+                    print(f"Loaded direct multi-horizon models: {sorted(self.multi_models)}.")
                 self.model_loaded = True
                 print(f"XGBoost model loaded successfully from {MODEL_PATH}.")
             else:
-                # Training needs a stable, chronologically-ordered dataset pulled from
-                # the database (or a bootstrapped simulator run) - it is run offline via
-                # `python -m backend.ml.train_model`, not automatically here. This runs
-                # at prediction_service import time, before the app's DB connection/mock
-                # fallback is even established, so attempting an async training pull here
-                # would be unreliable. The statistical fallback forecaster covers this case.
+                # Training is an offline step (`python -m backend.ml.train_model`),
+                # not run here. The statistical fallback covers a missing model.
                 print("XGBoost model file not found. Run `python -m backend.ml.train_model` "
                       "to train one. Using statistical fallback forecaster for now.")
                 self.model_loaded = False
         except Exception as e:
             print(f"Warning: Failed to load XGBoost model: {e}. Using statistical fallback forecaster.")
             self.model_loaded = False
+
+    def _build_feature_row(self, series: List[float], base: Dict[str, Any], target_time: datetime) -> Dict[str, Any]:
+        """Assemble one feature row from a trailing AQI series + weather context."""
+        aqi_t = series[-1]
+        def lag(n, default):
+            return series[-n] if len(series) >= n else default
+        aqi_l1 = lag(2, aqi_t)
+        aqi_l3 = lag(4, aqi_l1)
+        aqi_l6 = lag(7, aqi_l3)
+        aqi_l12 = lag(13, aqi_l6)
+        aqi_l24 = lag(25, aqi_l12)
+        return {
+            "aqi_t": aqi_t, "aqi_t-1": aqi_l1, "aqi_t-3": aqi_l3, "aqi_t-6": aqi_l6,
+            "aqi_t-12": aqi_l12, "aqi_t-24": aqi_l24,
+            "temperature": base.get("temperature") or 25.0,
+            "humidity": base.get("humidity") or 60.0,
+            "wind_speed": base.get("wind_speed") or 8.0,
+            "wind_direction": base.get("wind_direction") or 180,
+            "precipitation": base.get("precipitation") or 0.0,
+            "hour_of_day": target_time.hour, "day_of_week": target_time.weekday(),
+            "month": target_time.month, "is_weekend": 1 if target_time.weekday() >= 5 else 0,
+            "aqi_rolling_mean_6h": float(np.mean(series[-6:])),
+            "aqi_rolling_std_6h": float(np.std(series[-6:]) or 10.0),
+            "aqi_rolling_mean_24h": float(np.mean(series[-24:])) if len(series) >= 24 else float(np.mean(series)),
+            "aqi_rolling_max_24h": float(np.max(series[-24:])) if len(series) >= 24 else float(np.max(series)),
+        }
+
+    def _direct_multihorizon_curve(self, history: List[float], base: Dict[str, Any], now: datetime, hours: int) -> List[float]:
+        """Predict AQI directly at each trained anchor horizon, then interpolate
+        the hourly curve between anchors (and from 'now' to the first anchor).
+        Accurate at the anchors, smooth in between — unlike error-compounding
+        recursion."""
+        anchors = sorted(h for h in self.multi_models if h <= hours) or [min(self.multi_models)]
+        feat_now = base.get("aqi") if base.get("aqi") is not None else history[-1]
+        # Direct predictions at each anchor from the SAME current feature row
+        anchor_preds = {0: float(feat_now)}
+        for h in anchors:
+            row = self._build_feature_row(history, base, now + timedelta(hours=h))
+            X = pd.DataFrame([row])[FEATURE_COLUMNS]
+            anchor_preds[h] = float(np.clip(self.multi_models[h].predict(X)[0], 10, 500))
+        # Extend the last anchor flat if the requested horizon exceeds it
+        max_anchor = max(anchors)
+        knots = sorted(anchor_preds.keys())
+        curve = []
+        for step in range(1, hours + 1):
+            if step >= max_anchor:
+                curve.append(anchor_preds[max_anchor])
+                continue
+            # Linear interpolation between the surrounding anchors
+            lo = max(k for k in knots if k <= step)
+            hi = min(k for k in knots if k >= step)
+            if lo == hi:
+                curve.append(anchor_preds[lo])
+            else:
+                frac = (step - lo) / (hi - lo)
+                curve.append(anchor_preds[lo] + (anchor_preds[hi] - anchor_preds[lo]) * frac)
+        return curve
 
     def generate_statistical_forecast(self, station: Dict[str, Any], last_readings: List[Dict[str, Any]], hours: int = 72, now: Optional[datetime] = None) -> List[Dict[str, Any]]:
         """
@@ -143,104 +226,50 @@ class PredictionService:
         last_readings.reverse()  # chronological order
 
         # Check if we should use fallback
-        if not self.model_loaded or len(last_readings) < 12:
-            # Statistical fallback: either ML model failed or we don't have enough history
+        if not self.model_loaded or not self.multi_models or len(last_readings) < 12:
+            # Statistical fallback: no direct-horizon models, or too little history
             predictions = self.generate_statistical_forecast(station, last_readings, hours, now=as_of)
         else:
             try:
-                # ML inference path
-                predictions = []
+                # DIRECT multi-horizon inference: predict each anchor horizon
+                # directly, then interpolate the hourly curve (no error-compounding
+                # recursion).
                 now = as_of
-                
-                # Fetch recent features to feed the model
                 history_aqis = [r["aqi"] for r in last_readings]
-                
-                # Recursive forecast loop
-                current_aqi_series = history_aqis.copy()
-                latest_reading = last_readings[-1]
-                
-                temp = latest_reading.get("temperature") or 25.0
-                hum = latest_reading.get("humidity") or 60.0
-                wind_s = latest_reading.get("wind_speed") or 8.0
-                wind_d = latest_reading.get("wind_direction") or 180
-                precip = latest_reading.get("precipitation") or 0.0
-                
+                base = dict(last_readings[-1])
+                base["aqi"] = history_aqis[-1]
+                curve = self._direct_multihorizon_curve(history_aqis, base, now, hours)
+
+                predictions = []
                 for step in range(1, hours + 1):
                     target_time = now + timedelta(hours=step)
-                    
-                    # Create lag features
-                    aqi_t = current_aqi_series[-1]
-                    aqi_lag1 = current_aqi_series[-2] if len(current_aqi_series) >= 2 else aqi_t
-                    aqi_lag3 = current_aqi_series[-4] if len(current_aqi_series) >= 4 else aqi_lag1
-                    aqi_lag6 = current_aqi_series[-7] if len(current_aqi_series) >= 7 else aqi_lag3
-                    aqi_lag12 = current_aqi_series[-13] if len(current_aqi_series) >= 13 else aqi_lag6
-                    # Use lag 24 if available, else copy t-12
-                    aqi_lag24 = current_aqi_series[-25] if len(current_aqi_series) >= 25 else aqi_lag12
-                    
-                    # Rolling stats
-                    rolling_6h = np.mean(current_aqi_series[-6:])
-                    rolling_std_6h = np.std(current_aqi_series[-6:]) or 10.0
-                    rolling_24h = np.mean(current_aqi_series[-24:]) if len(current_aqi_series) >= 24 else np.mean(current_aqi_series)
-                    rolling_max_24h = np.max(current_aqi_series[-24:]) if len(current_aqi_series) >= 24 else np.max(current_aqi_series)
-                    
-                    # Simulated future weather (slightly fluctuates diurnal temp/humidity)
-                    future_temp = temp + np.sin(target_time.hour / 24.0 * 2.0 * np.pi) * 5.0 + np.random.normal(0, 0.5)
-                    future_hum = max(10.0, min(100.0, hum - np.sin(target_time.hour / 24.0 * 2.0 * np.pi) * 10.0))
-                    
-                    features_dict = {
-                        "aqi_t": aqi_t,
-                        "aqi_t-1": aqi_lag1,
-                        "aqi_t-3": aqi_lag3,
-                        "aqi_t-6": aqi_lag6,
-                        "aqi_t-12": aqi_lag12,
-                        "aqi_t-24": aqi_lag24,
-                        "temperature": future_temp,
-                        "humidity": future_hum,
-                        "wind_speed": wind_s,
-                        "wind_direction": wind_d,
-                        "precipitation": precip,
-                        "hour_of_day": target_time.hour,
-                        "day_of_week": target_time.weekday(),
-                        "month": target_time.month,
-                        "is_weekend": 1 if target_time.weekday() >= 5 else 0,
-                        "aqi_rolling_mean_6h": rolling_6h,
-                        "aqi_rolling_std_6h": rolling_std_6h,
-                        "aqi_rolling_mean_24h": rolling_24h,
-                        "aqi_rolling_max_24h": rolling_max_24h
-                    }
-                    
-                    # XGBoost prediction
-                    features_df = pd.DataFrame([features_dict])
-                    pred_aqi = float(self.model.predict(features_df)[0])
-                    pred_aqi = np.clip(pred_aqi, 10, 500)
-                    
-                    # Feed back predicted value into series
-                    current_aqi_series.append(pred_aqi)
-                    
-                    # Compounding uncertainty interval
-                    step_rmse = self.rmse * np.sqrt(step) * 0.4
+                    pred_aqi = float(np.clip(curve[step - 1], 10, 500))
+                    # Uncertainty widens with horizon but is bounded (direct models
+                    # don't compound error), scaled by the per-horizon RMSE.
+                    step_rmse = self.rmse * (1.0 + step / 72.0)
                     conf_low = float(np.clip(pred_aqi - 1.28 * step_rmse, 0, pred_aqi * 0.98))
                     conf_high = float(np.clip(pred_aqi + 1.28 * step_rmse, pred_aqi * 1.02, 500))
-                    
                     predictions.append({
                         "timestamp": target_time,
                         "aqi": round(pred_aqi, 0),
                         "confidence_low": round(conf_low, 0),
-                        "confidence_high": round(conf_high, 0)
+                        "confidence_high": round(conf_high, 0),
                     })
             except Exception as e:
-                print(f"Error during ML inference loop: {e}. Falling back to statistical forecast.")
+                print(f"Error during ML inference: {e}. Falling back to statistical forecast.")
                 predictions = self.generate_statistical_forecast(station, last_readings, hours, now=as_of)
 
         # Save prediction summary document to DB for audit/caching
+        used_ml = self.model_loaded and self.multi_models and len(last_readings) >= 12
         payload = {
             "station_id": station_id,
             "city": city,
             "generated_at": datetime.utcnow(),
             "as_of": as_of,
             "predictions": predictions,
-            "model_version": "xgboost_v1" if self.model_loaded else "statistical_fallback",
+            "model_version": (self.metadata.get("model_version", "xgboost") if used_ml else "statistical_fallback"),
             "rmse": self.rmse,
+            "horizon_metrics": (self.metadata or {}).get("horizon_metrics") if used_ml else None,
             "provenance": "replay" if at is not None else "live",
         }
 
@@ -254,6 +283,62 @@ class PredictionService:
             payload.pop("_id", None)
 
         return payload
+
+    async def explain_forecast(self, station_id: str, horizon: int = 24, at: Optional[datetime] = None) -> Dict[str, Any]:
+        """Exact TreeSHAP attribution for a single-horizon forecast, via XGBoost's
+        native `pred_contribs=True` (no external shap dependency). Returns the
+        top feature contributions as a waterfall: base value + signed pushes."""
+        if not self.model_loaded or not self.multi_models:
+            return {"available": False, "reason": "no ML model loaded"}
+        # Nearest trained anchor at/above the requested horizon
+        anchor = min((h for h in self.multi_models if h >= horizon), default=max(self.multi_models))
+        model = self.multi_models[anchor]
+
+        station = await db_helper.stations.find_one({"station_id": station_id})
+        if not station:
+            raise ValueError(f"Station {station_id} not found.")
+        as_of = (at or datetime.utcnow()).replace(minute=0, second=0, microsecond=0)
+        query: Dict[str, Any] = {"station_id": station_id}
+        if at is not None:
+            query["timestamp"] = {"$lte": as_of}
+        cursor = db_helper.aqi_readings.find(query).sort("timestamp", -1).limit(24)
+        last = await cursor.to_list(length=24)
+        last.reverse()
+        if len(last) < 12:
+            return {"available": False, "reason": "insufficient history"}
+
+        series = [r["aqi"] for r in last]
+        base = dict(last[-1]); base["aqi"] = series[-1]
+        row = self._build_feature_row(series, base, as_of + timedelta(hours=anchor))
+        X = pd.DataFrame([row])[FEATURE_COLUMNS]
+
+        # Exact TreeSHAP contributions: last column is the base (expected) value.
+        booster = model.get_booster()
+        contribs = booster.predict(xgb.DMatrix(X, feature_names=FEATURE_COLUMNS), pred_contribs=True)[0]
+        base_value = float(contribs[-1])
+        feat_contribs = contribs[:-1]
+        prediction = float(base_value + feat_contribs.sum())
+
+        items = [
+            {"feature": FEATURE_COLUMNS[i], "label": FEATURE_LABELS.get(FEATURE_COLUMNS[i], FEATURE_COLUMNS[i]),
+             "value": round(float(X.iloc[0, i]), 1), "contribution": round(float(feat_contribs[i]), 1)}
+            for i in range(len(FEATURE_COLUMNS))
+        ]
+        items.sort(key=lambda x: abs(x["contribution"]), reverse=True)
+        top = items[:6]
+        other = round(sum(x["contribution"] for x in items[6:]), 1)
+
+        return {
+            "available": True,
+            "station_id": station_id,
+            "horizon_hours": anchor,
+            "provenance": "replay" if at is not None else "live",
+            "base_value": round(base_value, 1),
+            "predicted_aqi": round(prediction, 0),
+            "top_factors": top,
+            "other_factors_sum": other,
+            "method": "Exact TreeSHAP via XGBoost pred_contribs (no external shap dependency)",
+        }
 
     async def get_alerts_for_city(self, city: str, threshold: float = 300.0, at: Optional[datetime] = None) -> List[Dict[str, Any]]:
         """

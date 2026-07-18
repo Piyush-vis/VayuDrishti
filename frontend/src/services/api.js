@@ -47,6 +47,7 @@ export const aqiApi = {
 export const predictApi = {
   forecast: (id, hours = 72) => apiClient.get(`/predict/forecast?station_id=${id}&hours=${hours}`).then(r => r.data),
   alerts: (city, threshold = 300) => apiClient.get(`/predict/alerts?city=${city}&threshold=${threshold}`).then(r => r.data),
+  explain: (id, horizon = 24) => apiClient.get(`/predict/explain?station_id=${id}&horizon=${horizon}`).then(r => r.data),
   trigger: (id) => apiClient.post(`/predict/trigger-forecast${id ? `?station_id=${id}` : ''}`).then(r => r.data),
 };
 

@@ -8,6 +8,7 @@ export function useStations(selectedStationId, activeCity) {
   const [trendReadings, setTrendReadings] = useState([]);
   const [forecast, setForecast] = useState([]);
   const [forecastMeta, setForecastMeta] = useState(null);
+  const [explanation, setExplanation] = useState(null);
   const [attributions, setAttributions] = useState(null);
 
   useEffect(() => {
@@ -16,6 +17,7 @@ export function useStations(selectedStationId, activeCity) {
         setTrendReadings([]);
         setForecast([]);
         setForecastMeta(null);
+        setExplanation(null);
         setAttributions(null);
         return;
     }
@@ -30,7 +32,15 @@ export function useStations(selectedStationId, activeCity) {
 
         const pred = await predictApi.forecast(selectedStationId, 72);
         setForecast(pred.predictions);
-        setForecastMeta({ rmse: pred.rmse, modelVersion: pred.model_version, provenance: pred.provenance, asOf: pred.as_of });
+        setForecastMeta({
+          rmse: pred.rmse, modelVersion: pred.model_version, provenance: pred.provenance,
+          asOf: pred.as_of, horizonMetrics: pred.horizon_metrics,
+        });
+
+        try {
+          const exp = await predictApi.explain(selectedStationId, 24);
+          setExplanation(exp);
+        } catch (e) { setExplanation(null); }
 
         const attr = await attributionApi.sources(activeCity, st.zone);
         setAttributions(attr);
@@ -42,5 +52,5 @@ export function useStations(selectedStationId, activeCity) {
     loadStationDetails();
   }, [selectedStationId, activeCity, replayAtDebounced]);
 
-  return { selectedStation, setSelectedStation, trendReadings, forecast, forecastMeta, attributions };
+  return { selectedStation, setSelectedStation, trendReadings, forecast, forecastMeta, explanation, attributions };
 }

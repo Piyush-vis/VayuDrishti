@@ -41,6 +41,7 @@ function App() {
     trendReadings,
     forecast,
     forecastMeta,
+    explanation,
     attributions
   } = useStations(selectedStationId, activeCity);
 
@@ -97,6 +98,7 @@ function App() {
                   selectedStation={selectedStation}
                   forecast={forecast}
                   forecastMeta={forecastMeta}
+                  explanation={explanation}
                   alerts={alerts}
                 />
               } 
