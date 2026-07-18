@@ -1,130 +1,139 @@
-# VayuDrishti — Presentation Deck Outline (10-12 slides)
+# VayuDrishti — Presentation Deck Outline (12 slides)
 
 > Ready-to-build slide content for Phase 3 (if selected as finalist). Paste each
-> section into a slide; speaker notes are the indented text. Pair with live demo
-> segments where marked **[LIVE DEMO]**.
+> section into a slide; speaker notes are the indented quotes. Pair with demo
+> segments where marked **[DEMO]** — run them against the Dec 2025 replay
+> (sidebar: Scenario → "Dec 2025 Delhi Severe+ Crisis") so nothing depends on live
+> API latency or July's clean monsoon air.
 
 ---
 
 ### Slide 1 — Title
 **VayuDrishti (वायुदृष्टि)**
-*AI-powered Urban Air Quality Intelligence Platform*
-Team [Your Team Name] · ET AI Hackathon 2.0
+*From reactive monitoring to forecast-triggered intervention.*
+Team [Your Team Name] · ET AI Hackathon 2026 · Problem Statement 5
 
 ---
 
-### Slide 2 — The Hook
-**1.67 million Indians die every year from air pollution.**
-The data to find them exists — 900+ CAAQMS stations under NCAP.
-The intelligence to act on it doesn't: only **31%** of monitored cities have any
-actionable response protocol (CAG, 2024).
+### Slide 2 — The Hook: the policy exists, the execution doesn't
+- **1.67 million Indians die every year** from air pollution (Lancet); cost **~$95B/yr, ~3% of GDP** (Dalberg/CII).
+- India already wrote the response policy: **GRAP** — CAQM's rules say stages "shall be invoked **in advance**" based on forecasts.
+- Reality: **13 of 17 GRAP invocations in winter 2025-26 were reactive** (ThePrint/CEEW).
+- **10 Nov 2025:** Delhi hits AQI 362. **GRAP-III arrives 11 Nov — at 425+.** A full day late.
 
-> Speaker note: pause after each line. This is the emotional opening — every judge
-> breathes this air too.
-
----
-
-### Slide 3 — The Problem, Precisely
-Three concrete capability gaps, not "not enough dashboards":
-1. No source attribution — AQI 320, but *why*?
-2. No forecasting — reactive to now, not to the next 72 hours.
-3. No compound-risk correlation — a breach looks the same whether it's a blip or a
-   genuine multi-signal event.
+> Speaker note: land the reframe — this is not a dashboards problem, it's an
+> execution-automation problem. We automate a policy the government already wrote.
 
 ---
 
-### Slide 4 — What VayuDrishti Is
-One platform, five connected capabilities:
-Live geospatial dashboard → 72h prediction → source attribution → multi-agent
-enforcement/advisory intelligence → regulatory RAG chatbot.
-
-**[LIVE DEMO]** Show the dashboard, switch cities (Delhi → Mumbai), toggle the
-heatmap.
-
----
-
-### Slide 5 — Architecture
-Insert the Mermaid diagram from `ARCHITECTURE.md` (render it as an image, or embed
-live if your slide tool supports Mermaid).
-
-> Speaker note: call out the three layers (Data / Intelligence / Presentation) and
-> that every AI-dependent path has a deterministic fallback — this is a production
-> posture, not a demo hack.
+### Slide 3 — One chain, one win
+```
+Forecast sees the crisis (24-72h, beats persistence at every horizon)
+  → GRAP engine drafts the Stage III/IV statutory order BEFORE the crossing
+    → evidence: CPF attribution + back-trajectories over Punjab fires
+      → human impact: people exposed, life-years, deaths averted
+        → citizens hear it in their language (voice)
+          → counter: signal → intervention in SECONDS vs the >24h govt lag
+```
+- Ten shipped capabilities, every one a link in this chain.
+- **57 pytest green · 8 cities · 25 stations · 6 languages · 2 tool-calling agents · runs with zero API keys.**
 
 ---
 
-### Slide 6 — Real Multi-Agent Intelligence (not a prompt wrapper)
-Two LangChain tool-calling agents, verified against live Gemini:
-- **Compound Risk Enforcement Agent** — pulls source attribution + forecast trend via
-  tools before judging if a breach is a genuine compound risk.
-- **Citizen Advisory Agent** — looks up nearby hospitals/schools itself, names them by
-  location when conditions are severe.
+### Slide 4 — Forecast-Triggered GRAP Automation (`services/grap.py`)
+- Official CAQM thresholds: **I 201-300 · II 301-400 · III 401-450 · IV >450**.
+- Trigger = earliest **sustained (≥3h)** crossing by observed AQI, the XGBoost forecast, **or** a persistence-with-trend projection — the drafted order **records which signal fired**. Never a black box.
+- Auto-drafts the CAQM-style order with the **real statutory checklist** (Stage III: BS-III petrol / BS-IV diesel ban, C&D halt; Stage IV: truck ban, total C&D ban, classes online), each action tagged to its agency, **plus lead-time gained**.
 
-**[LIVE DEMO]** Click "Run AI Compound-Risk Analysis" on an enforcement action; show
-the agent's rationale citing attribution + forecast data.
+**[DEMO]** GRAP panel in replay: Stage IV drafted while the city index is still climbing.
 
 ---
 
-### Slide 7 — Prediction, Evaluated Honestly
-72-hour XGBoost forecast, trained on real lag/rolling time-series features with a
-chronological train/test split.
+### Slide 5 — Forecasting, evaluated the honest way (`services/prediction.py`, `ml/`)
+- **Direct multi-horizon XGBoost** — one model per horizon (6/12/24/48/72h), chronological holdout, vs naive persistence (the PS's named baseline):
 
-**Result: RMSE 14.3 vs. 19.4 persistence baseline — a 26.2% improvement** — the exact
-metric this problem statement's evaluation focus names.
+| Horizon | Model RMSE | Persistence | Gain |
+|---|---|---|---|
+| 24h | **13.83** | 19.00 | **+27.2%** |
+| 48h | **13.76** | 19.22 | **+28.4%** |
+| 72h | **13.78** | 18.78 | **+26.6%** |
 
-**[LIVE DEMO]** Show the prediction chart with the confidence band; point out the
-alert when forecast crosses 300.
-
----
-
-### Slide 8 — Source Attribution, With Evidence
-Pie chart breakdown (vehicular / industrial / construction / biomass) backed by real
-TomTom traffic and NASA FIRMS fire-hotspot data, with circular-mean wind evidence.
-
-**[LIVE DEMO]** Open the attribution panel for a station; show the evidence trail.
+- Technical-rigor story: our first recursive forecaster **lost to persistence** in backtest — we found it, rebuilt it, committed the artifact (`backtest_results.json`).
+- Every forecast ships **exact TreeSHAP** (XGBoost `pred_contribs`): "+38 AQI: 24h-ago AQI +14, low wind +9, PM2.5 +11."
 
 ---
 
-### Slide 9 — Citizen Impact
-Multi-language (6 Indian languages) advisories, agent-generated per severity,
-naming specific nearby vulnerable locations. Vulnerability overlay (schools,
-hospitals, outdoor-worker zones) on the map.
+### Slide 6 — Evidence, not vibes: attribution + trajectories
+- **CPF (Conditional Probability Function)** wind-sector probabilities (openair method) + **PMF-calibrated priors** + measured station chemistry → real `confidence`, rendered as a **pollution rose**. Live covariates: NASA FIRMS + TomTom. **Zero random inputs** — a regression test fails if `random` re-enters the module. (`services/attribution.py`)
+- **HYSPLIT-lite back-trajectory × fire fusion**: *"this air mass crossed 10 active Punjab/Haryana fires within 17h — 570 km traced"*, animated on the map, limitations stated on-screen. (`services/trajectory.py`)
 
-**[LIVE DEMO]** Toggle the vulnerability overlay; switch advisory language tabs.
-
----
-
-### Slide 10 — Scalability
-- New city = one config entry, zero code changes.
-- Pooled, station-agnostic ML model — no per-station retraining to onboard stations.
-- Indexed for CPCB's full 900+ station network, not just the 8-city demo.
-- Agent cost scales with usage (on-demand), not station count — compatible with
-  free-tier LLM rate limits even at national scale.
+**[DEMO]** Trajectory animation over the Punjab fire field + the CPF rose.
 
 ---
 
-### Slide 11 — Business Impact & Roadmap
-- CPCB / SPCBs: evidence-backed, priority-ranked enforcement.
-- Municipal bodies: the "multi-agency response protocol" 69% of cities lack.
-- Roadmap: direct CAAQMS data partnership, mobile/IVR advisory delivery, permit-to-work
-  integration for the enforcement agent.
+### Slide 7 — Human impact + citizen voice
+- **Health engine** (`services/health_impact.py`): three cited lenses, pure arithmetic — AQLI life-years (0.098 yr/µg above WHO 5, capped), WHO AirQ+ excess deaths (RR 1.08/10µg, CRF capped at 150 — no extrapolation), population-weighted exposure (**~4.78M** across Delhi's curated stations). Output: "protects 4.78M people, averts ~13 deaths/day."
+- **Voice/IVR channel** (`hooks/useSpeech.js`, `IVRPreview.jsx`): browser TTS in **hi/ta/bn/te/kn**, phone-frame IVR + WhatsApp mock, advisories in **6 languages**. CPCB's own SAMEER app is English-only.
+
+**[DEMO]** Press "Dispatch voice advisory (हिंदी)" — the room hears it.
+
+---
+
+### Slide 8 — The Dec 2025 replay + Incident War Room
+- One-click, honestly-labelled **HISTORICAL REPLAY** of 13-16 Dec 2025 Delhi Severe+ (real peaks: **Anand Vihar 644, Wazirpur 635, Mundka 560, Mandir Marg 519**) — threaded through **every** service via an `at` timestamp. (`services/replay.py`)
+- **War Room** (`pages/WarRoom.jsx`): six-step pipeline — Signal → Attribution → Trace → Drafted response → Impact → Citizens alerted — with a wall-clock **signal→intervention counter in seconds**, next to the documented **>24h** government lag.
+- In replay: orders drafted **~14-36h before projected crossings — 24-48h before the real 13 Dec CAQM order**.
+
+**[DEMO]** This IS the demo — the full chain on one screen.
+
+---
+
+### Slide 9 — Scale is demonstrated, not asserted
+- **Official data.gov.in CPCB feed live** (`services/gov_feed.py`): **3,500 records, 500+ CAAQMS stations** published nationwide — we already speak the government's own data format.
+- New city = **a config entry, not an integration** · pooled station-agnostic model · agent cost scales with usage, not stations · cached-first LLM layer survives free-tier quotas.
+- **Two real `bind_tools()` agents** + compliance RAG (ChromaDB + TF-IDF fallback) — every AI path has a deterministic fallback; the whole app runs with **zero API keys**.
+- Provenance badges on every panel: **LIVE / CACHED / HISTORICAL REPLAY / SIMULATED / MODELLED**.
+
+---
+
+### Slide 10 — How we score (judging-criteria mapping)
+
+| Criterion | Weight | What earns it |
+|---|---|---|
+| Innovation | 25% | Forecast-triggered GRAP automation · CPF confidence · trajectory×fire fusion · replay-through-every-service |
+| Business Impact | 25% | Named buyer (CAQM / 131 NCAP cities) · documented failure fixed (13/17 reactive) · ₹11,211 cr NCAP money exists · impact in lives |
+| Technical Excellence | 20% | RMSE vs persistence +27.2/+28.4/+26.6% · exact TreeSHAP · zero-random attribution · 57 tests |
+| Scalability | 15% | data.gov.in feed live (500+ stations) · city = config entry · pooled model |
+| User Experience | 15% | War Room flow · replay drama · voice in Indian languages · provenance badges |
+
+PS evaluation focus → attribution accuracy (CPF + labels), forecast RMSE (above), enforcement quality (statutory checklists + agent verdicts), advisory relevance (6 languages + named locations), **response time (seconds vs >24h)**.
+
+---
+
+### Slide 11 — Business case, in rupees
+- Problem: **~$95B/yr (~3% GDP)**, **1.67M deaths/yr**.
+- The budget exists: **₹11,211 crore NCAP released, only ~68% utilised** (CREA); Delhi ~20% — performance-linked money in **131 cities** waiting for exactly this capability.
+- Procurement precedent: **DPCC already pays IIT-Kanpur crores** for real-time source apportionment in one city — we generalise it to all 131 via config.
+- Positioning: SAFAR ~7 metros · IITM-DSS Delhi-only, 2021 inventory, **suspended by CAQM** · only **8/131** NCAP cities have any early warning · Aurora (Nature 2025) validates AI-for-air at 44 km — we act at **ward scale**, where interventions happen.
+- Framing: **NCAP-fundable pilot aligned with CAQM policy and the Jan 2026 Supreme Court directive** (alignment, not endorsement).
 
 ---
 
 ### Slide 12 — Close
-**VayuDrishti doesn't just measure pollution. It tells you why, predicts what's next,
-and acts on it.**
+**The government already wrote the playbook. VayuDrishti runs it on time.**
+Forecast → statutory order → evidence → human impact → a citizen's own language — in seconds, not days.
 GitHub: [repo URL] · Team: [Your Team Name]
 
 ---
 
 ## Notes on building this in slides
 
-- Use the color palette and AQI category colors already defined in
+- Use the color palette and AQI category colors from
   `frontend/src/utils/aqiColors.js` / `constants.js` for visual consistency with the
   live product.
-- For the architecture diagram slide, render `ARCHITECTURE.md`'s Mermaid block via
-  the Mermaid Live Editor (mermaid.live) and export as PNG/SVG if your slide tool
-  doesn't support Mermaid natively.
-- Keep live demo segments under 30 seconds each — rehearse the exact click path
-  beforehand so nothing depends on live API latency during the actual pitch.
+- For an architecture slide (optional 5-second flash), render `ARCHITECTURE.md`'s
+  Mermaid block via mermaid.live and export as PNG/SVG.
+- Run every [DEMO] segment inside the Dec 2025 replay (Scenario →
+  "Dec 2025 Delhi Severe+ Crisis") — zero live-API dependence, dramatic data,
+  HISTORICAL REPLAY banner visible (that honesty is a feature; point at it).
+- Keep demo segments under 30 seconds each; rehearse the exact click path.
