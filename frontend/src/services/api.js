@@ -69,6 +69,11 @@ export const advisoryApi = {
   generate: (city, zone) => apiClient.post(`/advisory/generate?city=${city}&zone=${zone}`).then(r => r.data),
 };
 
+export const grapApi = {
+  status: (city, horizon = 48) => apiClient.get(`/grap/status?city=${city}&horizon=${horizon}`).then(r => r.data),
+  schedule: () => apiClient.get('/grap/schedule').then(r => r.data),
+};
+
 export const chatApi = {
   query: (question) => apiClient.post('/chat/query', { question }).then(r => r.data),
 };
