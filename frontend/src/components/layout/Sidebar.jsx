@@ -7,7 +7,8 @@ import {
   BellRing,
   BarChart3,
   Radio,
-  History
+  History,
+  Crosshair
 } from 'lucide-react';
 import { useReplay } from '../../context/ReplayContext';
 
@@ -16,6 +17,7 @@ const Sidebar = () => {
   const { episodes, episode, enterReplay, exitReplay } = useReplay();
   const menuItems = [
     { path: '/', label: 'Command Center', icon: LayoutDashboard },
+    { path: '/war-room', label: 'Incident War Room', icon: Crosshair },
     { path: '/predictions', label: '72H Predictions', icon: TrendingUp },
     { path: '/enforcement', label: 'Enforcement Desk', icon: ShieldAlert },
     { path: '/advisory', label: 'Citizen Portal', icon: BellRing },

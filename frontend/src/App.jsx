@@ -7,6 +7,7 @@ import ChatPanel from './components/panels/ChatPanel';
 
 // Pages
 import Dashboard from './pages/Dashboard';
+import WarRoom from './pages/WarRoom';
 import Predictions from './pages/Predictions';
 import Enforcement from './pages/Enforcement';
 import Advisory from './pages/Advisory';
@@ -85,8 +86,12 @@ function App() {
                 />
               } 
             />
-            <Route 
-              path="/predictions" 
+            <Route
+              path="/war-room"
+              element={<WarRoom activeCity={activeCity} />}
+            />
+            <Route
+              path="/predictions"
               element={
                 <Predictions
                   selectedStation={selectedStation}
