@@ -13,6 +13,7 @@ from backend.routers import (
     data,
     replay,
     grap,
+    health,
 )
 
 @asynccontextmanager
@@ -64,6 +65,7 @@ app.include_router(chat.router, prefix=api_prefix)
 app.include_router(data.router, prefix=api_prefix)
 app.include_router(replay.router, prefix=api_prefix)
 app.include_router(grap.router, prefix=api_prefix)
+app.include_router(health.router, prefix=api_prefix)
 
 @app.get("/")
 async def root():

@@ -8,6 +8,7 @@ import PollutantBreakdown from '../components/charts/PollutantBreakdown';
 import SourcePieChart from '../components/charts/SourcePieChart';
 import WindRose from '../components/charts/WindRose';
 import ProvenanceBadge from '../components/common/ProvenanceBadge';
+import HealthImpactPanel from '../components/panels/HealthImpactPanel';
 import { getAqiCategory, CITIES } from '../utils/constants';
 import { aqiApi } from '../services/api';
 import { useReplay } from '../context/ReplayContext';
@@ -132,6 +133,7 @@ function Dashboard({
       </div>
 
       <div className="w-full lg:w-[35%] flex flex-col gap-6 overflow-y-auto pr-1">
+        <HealthImpactPanel city={activeCity} />
         <div className="glass-card p-5 space-y-4">
           {selectedStation && activeStationReading ? (
             <>

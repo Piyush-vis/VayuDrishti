@@ -74,6 +74,11 @@ export const grapApi = {
   schedule: () => apiClient.get('/grap/schedule').then(r => r.data),
 };
 
+export const healthApi = {
+  city: (city) => apiClient.get(`/health-impact/city?city=${city}`).then(r => r.data),
+  action: (city, reductionPct = 30) => apiClient.get(`/health-impact/action?city=${city}&reduction_pct=${reductionPct}`).then(r => r.data),
+};
+
 export const chatApi = {
   query: (question) => apiClient.post('/chat/query', { question }).then(r => r.data),
 };
