@@ -81,13 +81,47 @@ class AttributionEvidence(BaseModel):
     nearby_industries: int
     active_construction_sites: int
     fire_hotspots_detected: int
+    wind_speed_kmh: float
+    wind_direction_deg: int
+
+class AttributionConfidenceComponents(BaseModel):
+    wind_sector_cpf: float
+    data_quality: float
+    sample_size: float
+
+class AttributionConfidence(BaseModel):
+    overall: float
+    band: str  # low | moderate | high
+    components: AttributionConfidenceComponents
+    method: str
+
+class WindRoseSector(BaseModel):
+    sector: str
+    centre_deg: float
+    hours: int
+    cpf: Optional[float] = None
+    mean_conc: Optional[float] = None
+
+class WindRose(BaseModel):
+    valid: bool
+    pollutant: str
+    threshold_ug_m3: Optional[float] = None
+    n_observations: int
+    calm_hours: int
+    sectors: List[WindRoseSector]
+    dominant: Optional[WindRoseSector] = None
 
 class SourceAttributionBase(BaseModel):
     zone: str
     city: str
     timestamp: datetime
     attributions: AttributionBreakdown
+    confidence: AttributionConfidence
     evidence: AttributionEvidence
+    evidence_sources: Dict[str, str]
+    wind_rose: WindRose
+    method: str
+    provenance: str  # live-hybrid | modelled | replay
 
 class SourceAttributionCreate(SourceAttributionBase):
     pass
