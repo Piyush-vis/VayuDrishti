@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { advisoryApi } from '../../services/api';
-import { AlertCircle, ShieldAlert, Hammer, RefreshCw } from 'lucide-react';
+import { AlertCircle, ShieldAlert, Hammer, RefreshCw, Volume2, Square } from 'lucide-react';
 import { useReplay } from '../../context/ReplayContext';
+import { useSpeech } from '../../hooks/useSpeech';
 
 const LANGUAGES = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
@@ -12,8 +13,9 @@ const LANGUAGES = [
   { code: 'te', label: 'Telugu (తెలుగు)', flag: '🇮🇳' }
 ];
 
-const AdvisoryPanel = ({ city, zone, aqiLevel, category }) => {
+const AdvisoryPanel = ({ city, zone, aqiLevel, category, onAdvisories }) => {
   const { replayAtDebounced } = useReplay();
+  const { supported, speak, stop, speakingKey } = useSpeech();
   const [selectedLang, setSelectedLang] = useState('en');
   const [advisories, setAdvisories] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -23,6 +25,7 @@ const AdvisoryPanel = ({ city, zone, aqiLevel, category }) => {
     try {
       const data = await advisoryApi.citizen(city, zone);
       setAdvisories(data.advisories);
+      if (onAdvisories) onAdvisories(data.advisories);
     } catch (e) {
       console.error("Failed to fetch advisories: ", e);
     } finally {
@@ -55,6 +58,26 @@ const AdvisoryPanel = ({ city, zone, aqiLevel, category }) => {
     const groupData = advisories[group];
     if (!groupData) return "No data for this group.";
     return groupData[selectedLang] || groupData['en'] || "No translation available.";
+  };
+
+  const ListenButton = ({ group }) => {
+    if (!supported) return null;
+    const key = `${group}-${selectedLang}`;
+    const isSpeaking = speakingKey === key;
+    return (
+      <button
+        onClick={() => (isSpeaking ? stop() : speak(getAdvisoryText(group), selectedLang, key))}
+        className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-md border text-[9px] font-bold uppercase tracking-wider transition-all active:scale-95 ${
+          isSpeaking
+            ? 'bg-red-600/20 border-red-500/40 text-red-300'
+            : 'bg-emerald-600/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/25'
+        }`}
+        title="Listen (browser text-to-speech)"
+      >
+        {isSpeaking ? <Square className="h-2.5 w-2.5" /> : <Volume2 className="h-2.5 w-2.5" />}
+        {isSpeaking ? 'Stop' : 'सुनें / Listen'}
+      </button>
+    );
   };
 
   return (
@@ -101,8 +124,11 @@ const AdvisoryPanel = ({ city, zone, aqiLevel, category }) => {
           <div className="p-2 bg-blue-500/10 text-blue-400 rounded-lg h-9 w-9 flex items-center justify-center shrink-0 border border-blue-500/20">
             <AlertCircle className="h-5 w-5" />
           </div>
-          <div>
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">General Public</h4>
+          <div className="flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider">General Public</h4>
+              <ListenButton group="general" />
+            </div>
             <p className="text-xs text-slate-300 mt-1 leading-relaxed">
               {getAdvisoryText('general')}
             </p>
@@ -114,8 +140,11 @@ const AdvisoryPanel = ({ city, zone, aqiLevel, category }) => {
           <div className="p-2 bg-orange-500/10 text-orange-400 rounded-lg h-9 w-9 flex items-center justify-center shrink-0 border border-orange-500/20">
             <ShieldAlert className="h-5 w-5" />
           </div>
-          <div>
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Vulnerable Groups</h4>
+          <div className="flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Vulnerable Groups</h4>
+              <ListenButton group="vulnerable" />
+            </div>
             <p className="text-xs text-slate-300 mt-1 leading-relaxed">
               {getAdvisoryText('vulnerable')}
             </p>
@@ -128,8 +157,11 @@ const AdvisoryPanel = ({ city, zone, aqiLevel, category }) => {
           <div className="p-2 bg-amber-500/10 text-amber-400 rounded-lg h-9 w-9 flex items-center justify-center shrink-0 border border-amber-500/20">
             <Hammer className="h-5 w-5" />
           </div>
-          <div>
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Outdoor Workers</h4>
+          <div className="flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Outdoor Workers</h4>
+              <ListenButton group="outdoor_workers" />
+            </div>
             <p className="text-xs text-slate-300 mt-1 leading-relaxed">
               {getAdvisoryText('outdoor_workers')}
             </p>
