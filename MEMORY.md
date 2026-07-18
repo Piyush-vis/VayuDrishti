@@ -4,22 +4,31 @@
 > proposing changes; do NOT re-litigate settled decisions; append (never rewrite
 > history) when you make a new significant decision. Dates are absolute.
 
-## Current state snapshot (as of 2026-07-19)
+## Current state snapshot (as of 2026-07-19, post Tier-0/Tier-1 build)
 
-- Full stack works end-to-end via `docker-compose up -d` with REAL MongoDB, verified
-  route-by-route. Also works with zero keys / no Mongo (simulator + in-memory mock).
-- 8 cities, 25 stations, 7 days seeded hourly history on first boot.
-- XGBoost forecaster (24h-ahead, recursive to 72h): **RMSE 14.3 vs persistence 19.4
-  (+26.2%)** on 8,400 chronologically held-out rows. Metadata in
-  `backend/ml/saved_models/model_metadata.joblib`.
-- Two genuine LangChain tool-calling agents verified against live Gemini:
-  compound-risk enforcement agent (tools: attribution, forecast trend, regulatory
-  RAG) and citizen advisory agent (tool: vulnerable-location lookup; 6 languages).
-- RAG over 3 CPCB doc files via ChromaDB (19 chunks) with TF-IDF fallback.
-- 17 pytest tests green.
-- Deliverable drafts exist: docs/DETAILED_DOCUMENT.md, PRESENTATION_DECK.md,
-  DEMO_SCRIPT.md; plus ARCHITECTURE.md, LICENSE, README.
-- NOTHING IS COMMITTED from the last several days of work — user must commit soon.
+- Full stack works end-to-end (smoke-tested route-by-route on local uvicorn + real
+  dockerized Mongo). Also works with zero keys / no Mongo (simulator + in-memory mock).
+- **Forecaster: direct multi-horizon XGBoost** (one model per horizon 6/12/24/48/72h,
+  interpolated curve). RMSE vs persistence: **24h +27.2%, 48h +28.4%, 72h +26.6%**
+  (`ml/saved_models/backtest_results.json`). The OLD recursive scheme was a bug (lost
+  to persistence) — fixed. Model version xgboost_v3_direct_multihorizon.
+- **57 pytest tests green.** All Tier-0 + Tier-1 features (T1-1..T1-10) shipped:
+  - Dec 2025 replay wired through every service via `at` (services/replay.py)
+  - Forecast-triggered GRAP engine (services/grap.py) + statutory checklists
+  - CPF attribution + confidence + pollution rose (services/attribution.py, zero random)
+  - HYSPLIT-lite back-trajectories × fires (services/trajectory.py)
+  - Health impact engine AQLI/WHO/exposure (services/health_impact.py, CRFs capped)
+  - Incident War Room + signal→intervention counter (pages/WarRoom.jsx)
+  - Voice/IVR (hooks/useSpeech.js, IVRPreview.jsx)
+  - data.gov.in official CPCB feed (services/gov_feed.py, 3500 live records)
+  - Exact TreeSHAP via XGBoost pred_contribs (no shap dep) + backtest
+  - LLM cache layer (services/llm_cache.py) + pregenerate script (needs fresh key)
+  - Provenance badges (LIVE/CACHED/REPLAY/SIMULATED/MODELLED) everywhere
+- README fully rewritten (champion formula, numbers-dense, honest, all claims match code).
+- ALL WORK COMMITTED incrementally (each milestone its own commit). New routers:
+  replay, grap, health, trajectory. New sidebar: Incident War Room, Scenario switcher.
+- Docker images NOT yet rebuilt with new features — `docker-compose up -d --build`
+  needed before the demo (port 8000 currently held by an OLD docker stack).
 
 ## Settled decisions
 

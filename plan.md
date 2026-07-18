@@ -430,18 +430,26 @@ protected) → 15s scalability (data.gov.in live, 131-city roadmap) → close.
 
 | Metric | Value | Where measured |
 |---|---|---|
-| Forecast RMSE (24h) vs persistence | 14.3 vs 19.4 (+26.2%) | `model_metadata.joblib`; backtest script (T1-9) will add 48/72h |
+| Forecast RMSE vs persistence (24/48/72h) | **13.83/13.76/13.78 vs 19.00/19.22/18.78 → +27.2%/+28.4%/+26.6%** | `ml/saved_models/backtest_results.json` (direct multi-horizon, `python -m backend.ml.backtest`) |
+| Forecast RMSE (24h) training holdout | 13.98 vs 19.44 (+28.1%) | `model_metadata.joblib` |
 | Cities / stations (curated) | 8 / 25 | `stations.json` |
-| Official-feed stations reachable | 500+ (CAAQMS via data.gov.in) | verified live 19 Jul |
-| Languages | 6 incl. English (fix wording per §4.3) | advisory templates/agent |
+| Official-feed records reachable | 3,500 live; 500+ CAAQMS stations published | verified live 19 Jul (`/data/gov-feed/coverage`) |
+| Languages | 6 incl. English | advisory templates/agent |
 | Tool-calling agents | 2 (enforcement compound-risk, citizen advisory) | `services/agents.py` |
-| Pytest count | 17 (will grow; update before submission) | `backend/tests/` |
+| Pytest count | **57** | `backend/tests/` |
 | GRAP thresholds | 201/301/401/451+ (Stages I-IV) | CAQM schedule PDF |
 | Reactive GRAP invocations 2025-26 | 13 of 17 | ThePrint/CEEW |
-| Dec 2025 episode peaks | Anand Vihar 644, Wazirpur 635, Mundka 560 | press/CAQM order 13 Dec 2025 |
-| Health coefficients | AQLI 0.098 yr per µg/m³ >5; WHO RR 1.08/10µg/m³ | EPIC/WHO |
+| Dec 2025 episode peaks | Anand Vihar 644, Wazirpur 635, Mundka 560, Mandir Marg 519 | press/CAQM order 13 Dec 2025 |
+| Health coefficients | AQLI 0.098 yr per µg/m³ >5 (annual-eq capped 130); WHO RR 1.08/10µg/m³ (CRF capped 150) | EPIC/WHO |
+| Delhi exposed population (curated stations) | ~4.78M | `services/health_impact.py` catchments |
 | Economic cost of problem | $95B/yr (3% GDP) Dalberg-CII; 1.67M deaths/yr Lancet | pitch docs |
 | NCAP funds | ₹11,211 cr released, 68% used, Delhi ~20% | CREA 2025/26 |
+
+**Build status (2026-07-19):** Tier 0 + all Tier 1 features T1-1..T1-10 SHIPPED
+and verified (replay, GRAP, CPF attribution, trajectories, health, war-room,
+voice, data.gov.in, SHAP+backtest, LLM cache, provenance badges, README rewrite).
+Forecaster recursion bug found+fixed (direct multi-horizon). Remaining = Tier 2
+(optional) + T1-11 (deploy/video/submit, needs USER).
 
 ## 13. Source bank (for pitch/docs writing — abbreviated; full URLs in research digest)
 
