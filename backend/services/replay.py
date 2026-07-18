@@ -264,5 +264,22 @@ class ReplayService:
             return []
         return ep.get("fires", {}).get("points", [])
 
+    def transport_wind(self, at: datetime, hour_index: int = 0) -> Optional[Dict[str, Any]]:
+        """Boundary-layer transport wind for back-trajectories during an episode.
+
+        Distinct from the surface calm that drives the AQI spike — this is the
+        elevated NW flow that advects stubble smoke into the basin. A small
+        deterministic wobble makes the trajectory a gentle curve, not a ray.
+        """
+        ep = self.episode_covering(at)
+        if not ep or "transport_wind" not in ep:
+            return None
+        tw = ep["transport_wind"]
+        wobble = tw.get("direction_wobble_deg", 0.0) * math.sin(hour_index / 6.0)
+        return {
+            "wind_direction": (tw["from_direction_deg"] + wobble) % 360,
+            "wind_speed": tw["speed_kmh"],
+        }
+
 
 replay_service = ReplayService()

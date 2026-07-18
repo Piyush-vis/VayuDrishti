@@ -79,6 +79,10 @@ export const healthApi = {
   action: (city, reductionPct = 30) => apiClient.get(`/health-impact/action?city=${city}&reduction_pct=${reductionPct}`).then(r => r.data),
 };
 
+export const trajectoryApi = {
+  back: (stationId, hours = 30) => apiClient.get(`/trajectory/back?station_id=${stationId}&hours=${hours}`).then(r => r.data),
+};
+
 export const chatApi = {
   query: (question) => apiClient.post('/chat/query', { question }).then(r => r.data),
 };

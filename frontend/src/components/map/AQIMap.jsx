@@ -1,8 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getAqiCategory } from '../../utils/constants';
+
+// Fire-detection icon for stubble-burning back-trajectory fusion
+const fireIcon = L.divIcon({
+  html: '<div style="font-size:16px;line-height:1;filter:drop-shadow(0 0 3px rgba(0,0,0,0.6))">🔥</div>',
+  className: 'fire-marker',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+});
 
 // Fix for default Leaflet icon marker assets in Vite
 // We override the default icon using a custom SVG marker
@@ -92,14 +100,16 @@ const LeafletHeatmap = ({ points, visible }) => {
   return null;
 };
 
-const AQIMap = ({ 
-  stations, 
-  center, 
-  heatmapPoints, 
-  showHeatmap, 
-  vulnerabilities, 
-  showVulnerabilities, 
-  onStationSelect 
+const AQIMap = ({
+  stations,
+  center,
+  heatmapPoints,
+  showHeatmap,
+  vulnerabilities,
+  showVulnerabilities,
+  onStationSelect,
+  trajectory,
+  showTrajectory
 }) => {
   
   // Custom marker for vulnerable points (schools/hospitals)
@@ -193,6 +203,43 @@ const AQIMap = ({
             </Marker>
           );
         })}
+
+        {/* HYSPLIT-lite back-trajectory + fire-detection fusion overlay */}
+        {showTrajectory && trajectory && trajectory.path && trajectory.path.length > 1 && (
+          <>
+            <Polyline
+              positions={trajectory.path.map((p) => [p.lat, p.lon])}
+              pathOptions={{ color: '#a855f7', weight: 3, opacity: 0.85, dashArray: '6 6' }}
+            />
+            {/* Full fire field (dim), so the crossed subset reads in context */}
+            {trajectory.all_fires && trajectory.all_fires.map((f, i) => (
+              <CircleMarker
+                key={`fa-${i}`}
+                center={[f.lat, f.lon]}
+                radius={3}
+                pathOptions={{ color: '#f97316', fillColor: '#f97316', fillOpacity: 0.35, weight: 0 }}
+              />
+            ))}
+            {/* Crossed fires (bright) */}
+            {trajectory.intersections && trajectory.intersections.map((f, i) => (
+              <Marker key={`fx-${i}`} position={[f.lat, f.lon]} icon={fireIcon}>
+                <Popup>
+                  <div className="p-1 text-xs">
+                    <div className="font-bold text-white">Active fire — {f.district}</div>
+                    <div className="text-slate-400">Crossed the air mass ~{f.hours_ago}h upwind</div>
+                    {f.frp != null && <div className="text-slate-400">FRP: {f.frp} MW · {f.distance_km} km off-path</div>}
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
+            {/* Receptor endpoint marker */}
+            <CircleMarker
+              center={[trajectory.origin.lat, trajectory.origin.lon]}
+              radius={6}
+              pathOptions={{ color: '#a855f7', fillColor: '#c084fc', fillOpacity: 0.9 }}
+            />
+          </>
+        )}
 
         {/* Vulnerability overlays (schools, hospitals) */}
         {showVulnerabilities && vulnerabilities && vulnerabilities.map((item, idx) => (

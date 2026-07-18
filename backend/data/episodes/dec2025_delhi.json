@@ -72,6 +72,12 @@
     "night_humidity": 92.0,
     "day_humidity": 65.0
   },
+  "transport_wind_note": "Surface winds are calm (which TRAPS local emissions and drives the AQI spike), but stubble smoke arrives on the stronger north-westerly boundary-layer transport flow above the surface. Back-trajectories use this transport wind, not the surface calm — the classic reason 2D surface-only trajectories under-estimate long-range transport.",
+  "transport_wind": {
+    "from_direction_deg": 318,
+    "speed_kmh": 19.0,
+    "direction_wobble_deg": 6.0
+  },
   "fires": {
     "note": "Representative archived VIIRS-style detections over Punjab/Haryana residual paddy-residue and biomass burning, mid-December 2025. Coordinates are district-level representative points, not raw FIRMS pixels.",
     "points": [

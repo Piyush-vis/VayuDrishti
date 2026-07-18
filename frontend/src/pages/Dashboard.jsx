@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import React, { useState, useEffect, useRef } from 'react';
-import { Map as MapIcon, Eye } from 'lucide-react';
+import { Map as MapIcon, Eye, Wind } from 'lucide-react';
 import AQIMap from '../components/map/AQIMap';
 import TimeSlider from '../components/map/TimeSlider';
 import AQITrendChart from '../components/charts/AQITrendChart';
@@ -10,7 +10,7 @@ import WindRose from '../components/charts/WindRose';
 import ProvenanceBadge from '../components/common/ProvenanceBadge';
 import HealthImpactPanel from '../components/panels/HealthImpactPanel';
 import { getAqiCategory, CITIES } from '../utils/constants';
-import { aqiApi } from '../services/api';
+import { aqiApi, trajectoryApi } from '../services/api';
 import { useReplay } from '../context/ReplayContext';
 
 // Honest per-covariate source labels — mirrors backend evidence_sources values
@@ -47,10 +47,22 @@ function Dashboard({
     trendReadings,
     attributions
 }) {
-  const { episode } = useReplay();
+  const { episode, replayAtDebounced } = useReplay();
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showVulnerabilities, setShowVulnerabilities] = useState(false);
+  const [showTrajectory, setShowTrajectory] = useState(false);
+  const [trajectory, setTrajectory] = useState(null);
   const timelapseRequestId = useRef(0);
+
+  // Load the back-trajectory for the selected station when the overlay is on
+  useEffect(() => {
+    if (!showTrajectory || !selectedStationId) { setTrajectory(null); return; }
+    let cancelled = false;
+    trajectoryApi.back(selectedStationId, 30)
+      .then((t) => { if (!cancelled) setTrajectory(t); })
+      .catch((e) => console.error('Trajectory load failed:', e));
+    return () => { cancelled = true; };
+  }, [showTrajectory, selectedStationId, replayAtDebounced]);
 
   // Set default station if none selected and we have readings
   useEffect(() => {
@@ -86,26 +98,55 @@ function Dashboard({
           <button
             onClick={() => setShowVulnerabilities(!showVulnerabilities)}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg border transition-all ${
-              showVulnerabilities 
-                ? 'bg-blue-600 border-blue-500 text-white shadow shadow-blue-500/20' 
+              showVulnerabilities
+                ? 'bg-blue-600 border-blue-500 text-white shadow shadow-blue-500/20'
                 : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white backdrop-blur'
             }`}
           >
             <Eye className="h-3 w-3" />
             <span>Vulnerabilities</span>
           </button>
+          <button
+            onClick={() => setShowTrajectory(!showTrajectory)}
+            disabled={!selectedStationId}
+            title={selectedStationId ? 'Trace this air mass back to its fire sources' : 'Select a station first'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg border transition-all disabled:opacity-40 ${
+              showTrajectory
+                ? 'bg-purple-600 border-purple-500 text-white shadow shadow-purple-500/20'
+                : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white backdrop-blur'
+            }`}
+          >
+            <Wind className="h-3 w-3" />
+            <span>Back-trajectory</span>
+          </button>
         </div>
 
         <div className="flex-1 min-h-0">
-          <AQIMap 
-            stations={currentReadings} 
+          <AQIMap
+            stations={currentReadings}
             center={activeCityCoords}
             heatmapPoints={heatmapPoints}
             showHeatmap={showHeatmap}
             vulnerabilities={vulnerabilities}
             showVulnerabilities={showVulnerabilities}
             onStationSelect={setSelectedStationId}
+            trajectory={trajectory}
+            showTrajectory={showTrajectory}
           />
+          {showTrajectory && trajectory && (
+            <div className="absolute bottom-20 left-4 z-[1000] max-w-xs bg-slate-900/95 border border-purple-500/40 rounded-lg p-3 backdrop-blur shadow-2xl">
+              <div className="flex items-center gap-1.5 text-purple-300 mb-1">
+                <Wind className="h-3 w-3" />
+                <span className="text-[10px] font-black uppercase tracking-wider">Air-mass back-trajectory</span>
+              </div>
+              <p className="text-[10px] text-slate-300 leading-relaxed">{trajectory.summary}</p>
+              <div className="text-[9px] text-slate-500 mt-1.5 flex gap-3">
+                <span>{trajectory.total_travel_km} km traced</span>
+                <span>{trajectory.fires_crossed}/{trajectory.fires_total} fires crossed</span>
+              </div>
+              <p className="text-[8px] text-slate-600 mt-1 leading-tight">{trajectory.limitations}</p>
+            </div>
+          )}
         </div>
 
         {/* Live timelapse slider is replaced by the global replay scrubber
