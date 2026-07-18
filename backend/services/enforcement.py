@@ -1,29 +1,35 @@
 import os
-import random
 from datetime import datetime, timedelta
 from bson import ObjectId
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from backend.models.database import db_helper
 from backend.models.schemas import EnforcementActionCreate
 
 class EnforcementService:
-    async def scan_for_anomalies_and_generate_actions(self, city: str) -> List[Dict[str, Any]]:
+    async def scan_for_anomalies_and_generate_actions(self, city: str, at: Optional[datetime] = None) -> List[Dict[str, Any]]:
         """
         Scan recent readings in the city for pollution breaches and generate
         priority-ranked enforcement action recommendations.
+
+        `at`: scan as of a historical timestamp (replay mode) — actions are
+        generated ephemerally and never persisted, so replay runs don't pollute
+        the live enforcement queue.
         """
+        replay_mode = at is not None
+        now = at or datetime.utcnow()
+
         # Find active stations in city
         cursor = db_helper.stations.find({"city": city, "active": True})
         stations = await cursor.to_list(length=100)
-        
+
         station_ids = [s["station_id"] for s in stations]
         station_map = {s["station_id"]: s for s in stations}
-        
-        # Fetch readings for last 6 hours
-        cutoff_time = datetime.utcnow() - timedelta(hours=6)
+
+        # Fetch readings for the 6 hours leading up to `now`
+        cutoff_time = now - timedelta(hours=6)
         cursor = db_helper.aqi_readings.find({
             "station_id": {"$in": station_ids},
-            "timestamp": {"$gte": cutoff_time}
+            "timestamp": {"$gte": cutoff_time, "$lte": now}
         }).sort("timestamp", -1)
         recent_readings = await cursor.to_list(length=500)
         
@@ -132,22 +138,30 @@ class EnforcementService:
                 
                 action_doc = {
                     "city": city,
-                    "generated_at": datetime.utcnow(),
+                    "generated_at": now,
                     "priority": priority,
                     "action_type": action_type,
                     "title": title,
                     "description": description,
                     "evidence": evidence,
-                    "status": "pending"
+                    "status": "pending",
+                    "provenance": "replay" if replay_mode else "live",
                 }
-                
+
+                if replay_mode:
+                    # Ephemeral: stable synthetic id, no persistence, no dedupe
+                    # against the live queue.
+                    action_doc["_id"] = f"replay_{s_id}_{pollutant}_{now.strftime('%Y%m%d%H')}"
+                    generated_actions.append(action_doc)
+                    continue
+
                 # Check if an identical active alert already exists to prevent duplication
                 exists = await db_helper.enforcement_actions.find_one({
                     "evidence.station_id": s_id,
                     "evidence.pollutant": pollutant,
                     "status": "pending"
                 })
-                
+
                 if not exists:
                     # Save to db
                     res = await db_helper.enforcement_actions.insert_one(action_doc)
@@ -160,21 +174,25 @@ class EnforcementService:
         # Return priority sorted actions
         return sorted(generated_actions, key=lambda x: x["priority"])
 
-    async def get_actions_by_city(self, city: str) -> List[Dict[str, Any]]:
+    async def get_actions_by_city(self, city: str, at: Optional[datetime] = None) -> List[Dict[str, Any]]:
         """
         Retrieve all active enforcement actions for a city.
-        If empty, runs the scan first.
+        If empty, runs the scan first. In replay mode (`at` set) the stored
+        queue is bypassed entirely — actions are recomputed as of `at`.
         """
+        if at is not None:
+            return await self.scan_for_anomalies_and_generate_actions(city, at=at)
+
         cursor = db_helper.enforcement_actions.find({"city": city}).sort("priority", 1)
         actions = await cursor.to_list(length=100)
-        
+
         # Serialize ObjectIds to strings
         for a in actions:
             a["_id"] = str(a["_id"])
-            
+
         if not actions:
             actions = await self.scan_for_anomalies_and_generate_actions(city)
-            
+
         return actions
 
     async def get_action_by_id(self, action_id: str) -> Dict[str, Any]:

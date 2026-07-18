@@ -3,8 +3,10 @@ import { enforcementApi } from '../../services/api';
 import { ShieldCheck, Clock, AlertTriangle, PlayCircle, Sparkles, Loader2 } from 'lucide-react';
 import { formatDateTime } from '../../utils/formatters';
 import LoadingSpinner from '../common/LoadingSpinner';
+import { useReplay } from '../../context/ReplayContext';
 
 const EnforcementPanel = ({ city, onRefresh }) => {
+  const { replayAtDebounced } = useReplay();
   const [actions, setActions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [analyzingId, setAnalyzingId] = useState(null);
@@ -24,9 +26,10 @@ const EnforcementPanel = ({ city, onRefresh }) => {
 
   useEffect(() => {
     if (city) {
+      // re-fetch whenever the replay timeline moves
       fetchActions();
     }
-  }, [city]);
+  }, [city, replayAtDebounced]);
 
   const handleUpdateStatus = async (id, currentStatus) => {
     let nextStatus = 'assigned';

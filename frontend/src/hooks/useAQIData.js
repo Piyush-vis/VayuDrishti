@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { aqiApi, advisoryApi, predictApi } from '../services/api';
+import { useReplay } from '../context/ReplayContext';
 
 export function useAQIData(activeCity) {
+  const { replayAtDebounced } = useReplay();
   const [stations, setStations] = useState([]);
   const [currentReadings, setCurrentReadings] = useState([]);
   const [heatmapPoints, setHeatmapPoints] = useState([]);
@@ -32,7 +34,7 @@ export function useAQIData(activeCity) {
 
   useEffect(() => {
     fetchBaseData();
-  }, [activeCity]);
+  }, [activeCity, replayAtDebounced]);
 
   return { stations, currentReadings, setCurrentReadings, heatmapPoints, vulnerabilities, alerts, syncTime, fetchBaseData };
 }

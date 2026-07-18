@@ -1,12 +1,14 @@
 from fastapi import APIRouter, HTTPException, Query
 from backend.services.advisory import advisory_service
+from backend.services.replay import parse_at
 
 router = APIRouter(prefix="/advisory", tags=["advisory"])
 
 @router.get("/citizen")
-async def get_advisory(city: str, zone: str = Query(default=None)):
+async def get_advisory(city: str, zone: str = Query(default=None), at: str = Query(default=None)):
     """
-    Get citizen health advisory cards for a specific zone in all 6 target Indian languages.
+    Get citizen health advisory cards for a specific zone in all 6 target languages.
+    With `at`, the advisory reflects conditions at that historical timestamp.
     """
     try:
         if not zone:
@@ -21,8 +23,8 @@ async def get_advisory(city: str, zone: str = Query(default=None)):
                 "jabalpur": "Central Jabalpur"
             }
             zone = default_zones.get(city.lower(), "Central Zone")
-            
-        data = await advisory_service.get_advisories_for_zone(city, zone)
+
+        data = await advisory_service.get_advisories_for_zone(city, zone, at=parse_at(at))
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

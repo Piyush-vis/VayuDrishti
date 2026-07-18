@@ -1,7 +1,7 @@
 import json
 import asyncio
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from google import genai
 from backend.config import settings
 from backend.models.database import db_helper
@@ -187,24 +187,31 @@ class AdvisoryService:
         elif aqi <= 400: return "Very Poor"
         return "Severe"
 
-    async def get_advisories_for_zone(self, city: str, zone: str) -> Dict[str, Any]:
+    async def get_advisories_for_zone(self, city: str, zone: str, at: Optional[datetime] = None) -> Dict[str, Any]:
         """
         Retrieve the latest advisory for a zone, or generate one if not present.
+
+        `at`: advise as of a historical timestamp (replay mode) — deterministic
+        template path only (no LLM spend), nothing persisted.
         """
+        replay_mode = at is not None
+        now = at or datetime.utcnow()
+
         # Find latest readings for stations in this zone
         cursor = db_helper.stations.find({"city": city.lower(), "zone": zone, "active": True})
         stations = await cursor.to_list(length=20)
-        
+
         if not stations:
             cursor = db_helper.stations.find({"city": city.lower(), "active": True})
             stations = await cursor.to_list(length=100)
-            
+
         station_ids = [s["station_id"] for s in stations]
-        
-        # Get average AQI
-        cursor = db_helper.aqi_readings.find(
-            {"station_id": {"$in": station_ids}}
-        ).sort("timestamp", -1).limit(len(station_ids))
+
+        # Get average AQI (as of `now` in replay mode)
+        readings_query: Dict[str, Any] = {"station_id": {"$in": station_ids}}
+        if replay_mode:
+            readings_query["timestamp"] = {"$gte": now - timedelta(hours=6), "$lte": now}
+        cursor = db_helper.aqi_readings.find(readings_query).sort("timestamp", -1).limit(len(station_ids))
         readings = await cursor.to_list(length=len(station_ids))
         
         avg_aqi = 150.0
@@ -224,53 +231,74 @@ class AdvisoryService:
             pollutants_list = [p[0] for p in sorted_pol[:2]]
             
         category = self.get_aqi_category(avg_aqi)
-        
+
+        # Replay mode: deterministic template advisory as of the historical hour,
+        # never cached, never persisted, zero LLM spend.
+        if replay_mode:
+            return {
+                "city": city.lower(),
+                "zone": zone,
+                "generated_at": now,
+                "aqi_level": round(avg_aqi, 0),
+                "category": category,
+                "advisories": LOCAL_ADVISORY_TEMPLATES[category],
+                "source": "template",
+                "provenance": "replay",
+            }
+
         # Check if recent advisory already exists in DB
         exists = await db_helper.citizen_advisories.find_one(
             {"city": city.lower(), "zone": zone},
             sort=[("generated_at", -1)]
         )
-        
+
         # If it exists and was generated in the last hour, return it
         if exists and (datetime.utcnow() - exists["generated_at"]) < timedelta(hours=1):
             exists["_id"] = str(exists["_id"])
+            exists.setdefault("source", "template")
+            exists["provenance"] = "cached"
             return exists
-            
-        # Compile advisory payload
-        advisories = {}
-        
+
         # Try the tool-calling Citizen Advisory Agent first (it can look up nearby
         # vulnerable locations itself for severe conditions), then the raw single-shot
         # Gemini prompt, then static templates - each a strictly more resilient fallback.
         advisories = None
+        source = "template"
         if settings.GEMINI_API_KEY:
             try:
                 from backend.services.agents import generate_citizen_advisory_agentic
                 advisories = await generate_citizen_advisory_agentic(city, zone, avg_aqi, category, pollutants_list)
+                if advisories:
+                    source = "agent"
             except Exception as e:
                 print(f"Citizen Advisory Agent failed: {e}. Falling back to single-shot Gemini prompt.")
 
             if not advisories:
                 try:
                     advisories = await self._generate_gemini_advisory(city, zone, avg_aqi, category, pollutants_list)
+                    if advisories:
+                        source = "gemini"
                 except Exception as e:
                     print(f"Gemini advisory generation failed: {e}. Falling back to templates.")
 
         if not advisories:
             advisories = LOCAL_ADVISORY_TEMPLATES[category]
-            
+            source = "template"
+
         payload = {
             "city": city.lower(),
             "zone": zone,
             "generated_at": datetime.utcnow(),
             "aqi_level": round(avg_aqi, 0),
             "category": category,
-            "advisories": advisories
+            "advisories": advisories,
+            "source": source,
+            "provenance": "live",
         }
-        
+
         res = await db_helper.citizen_advisories.insert_one(payload)
         payload["_id"] = str(res.inserted_id)
-        
+
         return payload
 
     async def _generate_gemini_advisory(self, city: str, zone: str, aqi: float, category: str, pollutants: List[str]) -> Dict[str, Any]:

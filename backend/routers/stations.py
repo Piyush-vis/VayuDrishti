@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Query, HTTPException
 from backend.models.database import db_helper
+from backend.services.replay import parse_at
 from typing import List
 
 router = APIRouter(prefix="/stations", tags=["stations"])
@@ -37,20 +38,23 @@ async def get_station(station_id: str):
     return station
 
 @router.get("/{station_id}/readings")
-async def get_readings(station_id: str, hours: int = Query(default=24, ge=1, le=168)):
+async def get_readings(station_id: str, hours: int = Query(default=24, ge=1, le=168), at: str = Query(default=None)):
     """
     Get recent readings for a specific station. Max history: 168 hours (7 days).
+    With `at`, the window ends at that historical timestamp (replay mode).
     """
     try:
+        at_dt = parse_at(at)
         # Verify station exists
         station = await db_helper.stations.find_one({"station_id": station_id})
         if not station:
             raise HTTPException(status_code=404, detail=f"Station {station_id} not found.")
-            
+
         # Get recent readings sorted by timestamp descending
-        cursor = db_helper.aqi_readings.find(
-            {"station_id": station_id}
-        ).sort("timestamp", -1).limit(hours)
+        query = {"station_id": station_id}
+        if at_dt is not None:
+            query["timestamp"] = {"$lte": at_dt}
+        cursor = db_helper.aqi_readings.find(query).sort("timestamp", -1).limit(hours)
         
         readings = await cursor.to_list(length=hours)
         readings.reverse()  # return in chronological order for graphs

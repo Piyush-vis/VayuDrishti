@@ -9,6 +9,27 @@ const apiClient = axios.create({
   },
 });
 
+// --- Historical replay plumbing -------------------------------------------
+// When a replay episode is active, every GET request is transparently stamped
+// with `at=<historical ISO timestamp>` so the whole backend (readings, map,
+// forecasts, attribution, GRAP, enforcement, advisories) answers as of that
+// moment. Routes that don't support `at` simply ignore it.
+let _replayAt = null;
+export const setGlobalReplayAt = (isoOrNull) => { _replayAt = isoOrNull; };
+
+apiClient.interceptors.request.use((config) => {
+  if (_replayAt && (config.method || 'get').toLowerCase() === 'get') {
+    config.params = { ...(config.params || {}), at: _replayAt };
+  }
+  return config;
+});
+
+export const replayApi = {
+  episodes: () => apiClient.get('/replay/episodes').then(r => r.data),
+  episode: (id) => apiClient.get(`/replay/episodes/${id}`).then(r => r.data),
+  seed: (id) => apiClient.post(`/replay/episodes/${id}/seed`).then(r => r.data),
+};
+
 export const stationsApi = {
   list: (city) => apiClient.get(`/stations${city ? `?city=${city}` : ''}`).then(r => r.data),
   get: (id) => apiClient.get(`/stations/${id}`).then(r => r.data),

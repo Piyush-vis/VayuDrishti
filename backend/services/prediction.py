@@ -3,7 +3,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from backend.config import settings
 from backend.models.database import db_helper
 
@@ -42,7 +42,7 @@ class PredictionService:
             print(f"Warning: Failed to load XGBoost model: {e}. Using statistical fallback forecaster.")
             self.model_loaded = False
 
-    def generate_statistical_forecast(self, station: Dict[str, Any], last_readings: List[Dict[str, Any]], hours: int = 72) -> List[Dict[str, Any]]:
+    def generate_statistical_forecast(self, station: Dict[str, Any], last_readings: List[Dict[str, Any]], hours: int = 72, now: Optional[datetime] = None) -> List[Dict[str, Any]]:
         """
         Fallback forecaster combining persistence, station diurnal pattern, and weather conditions.
         Ensures the UI always gets realistic predictions.
@@ -64,7 +64,7 @@ class PredictionService:
             start_wind = 7.0
             
         forecast_items = []
-        now = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+        now = (now or datetime.utcnow()).replace(minute=0, second=0, microsecond=0)
         
         # We model a diurnal variation factor based on hour of day
         # Peak: 7-9 AM (+25 AQI), 7-10 PM (+35 AQI)
@@ -118,31 +118,39 @@ class PredictionService:
             
         return forecast_items
 
-    async def get_forecast_for_station(self, station_id: str, hours: int = 72) -> Dict[str, Any]:
+    async def get_forecast_for_station(self, station_id: str, hours: int = 72, at: Optional[datetime] = None) -> Dict[str, Any]:
         """
         Retrieve 72-hour AQI prediction with confidence bands for a station.
+
+        `at`: forecast as of a historical timestamp (replay mode) — features are
+        built only from readings at or before `at`, and the result is not
+        persisted (so replay runs never pollute the live prediction cache).
         """
         # Fetch station metadata
         station = await db_helper.stations.find_one({"station_id": station_id})
         if not station:
             raise ValueError(f"Station {station_id} not found.")
-            
+
         city = station["city"]
-        
-        # Fetch last 24 readings to build lagged features
-        cursor = db_helper.aqi_readings.find({"station_id": station_id}).sort("timestamp", -1).limit(24)
+        as_of = (at or datetime.utcnow()).replace(minute=0, second=0, microsecond=0)
+
+        # Fetch last 24 readings (at or before `as_of`) to build lagged features
+        readings_query: Dict[str, Any] = {"station_id": station_id}
+        if at is not None:
+            readings_query["timestamp"] = {"$lte": as_of}
+        cursor = db_helper.aqi_readings.find(readings_query).sort("timestamp", -1).limit(24)
         last_readings = await cursor.to_list(length=24)
         last_readings.reverse()  # chronological order
-        
+
         # Check if we should use fallback
         if not self.model_loaded or len(last_readings) < 12:
             # Statistical fallback: either ML model failed or we don't have enough history
-            predictions = self.generate_statistical_forecast(station, last_readings, hours)
+            predictions = self.generate_statistical_forecast(station, last_readings, hours, now=as_of)
         else:
             try:
                 # ML inference path
                 predictions = []
-                now = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+                now = as_of
                 
                 # Fetch recent features to feed the model
                 history_aqis = [r["aqi"] for r in last_readings]
@@ -222,44 +230,51 @@ class PredictionService:
                     })
             except Exception as e:
                 print(f"Error during ML inference loop: {e}. Falling back to statistical forecast.")
-                predictions = self.generate_statistical_forecast(station, last_readings, hours)
-                
+                predictions = self.generate_statistical_forecast(station, last_readings, hours, now=as_of)
+
         # Save prediction summary document to DB for audit/caching
         payload = {
             "station_id": station_id,
             "city": city,
             "generated_at": datetime.utcnow(),
+            "as_of": as_of,
             "predictions": predictions,
             "model_version": "xgboost_v1" if self.model_loaded else "statistical_fallback",
-            "rmse": self.rmse
+            "rmse": self.rmse,
+            "provenance": "replay" if at is not None else "live",
         }
-        
-        # Note: motor's insert_one() mutates `payload` in place, adding a raw (non-JSON-
-        # serializable) ObjectId as "_id" - strip it before returning, since this
-        # response's schema doesn't expose an _id field. The in-memory mock DB used
-        # when MongoDB is unreachable deep-copies before inserting, so this only bites
-        # with a real MongoDB connection.
-        await db_helper.predictions.insert_one(payload)
-        payload.pop("_id", None)
+
+        # Replay forecasts are ephemeral — persisting them would pollute the live
+        # prediction cache that get_alerts_for_city() reads.
+        if at is None:
+            # Note: motor's insert_one() mutates `payload` in place, adding a raw
+            # (non-JSON-serializable) ObjectId as "_id" - strip it before returning.
+            # The in-memory mock DB deep-copies, so this only bites with real MongoDB.
+            await db_helper.predictions.insert_one(payload)
+            payload.pop("_id", None)
 
         return payload
 
-    async def get_alerts_for_city(self, city: str, threshold: float = 300.0) -> List[Dict[str, Any]]:
+    async def get_alerts_for_city(self, city: str, threshold: float = 300.0, at: Optional[datetime] = None) -> List[Dict[str, Any]]:
         """
         Find any stations in a city that are predicted to breach the AQI threshold (e.g. 300 - 'Very Poor').
         """
         cursor = db_helper.stations.find({"city": city, "active": True})
         stations = await cursor.to_list(length=100)
-        
+
         alerts = []
         for station in stations:
             station_id = station["station_id"]
-            # Get latest prediction
-            pred_doc = await db_helper.predictions.find_one(
-                {"station_id": station_id},
-                sort=[("generated_at", -1)]
-            )
-            
+            if at is not None:
+                # Replay mode: always compute fresh as-of the historical timestamp
+                pred_doc = await self.get_forecast_for_station(station_id, hours=48, at=at)
+            else:
+                # Get latest prediction
+                pred_doc = await db_helper.predictions.find_one(
+                    {"station_id": station_id},
+                    sort=[("generated_at", -1)]
+                )
+
             if not pred_doc:
                 # Generate on the fly
                 pred_doc = await self.get_forecast_for_station(station_id, hours=24)

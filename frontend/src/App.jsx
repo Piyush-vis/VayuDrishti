@@ -15,6 +15,7 @@ import Compare from './pages/Compare';
 // Hooks
 import { useAQIData } from './hooks/useAQIData';
 import { useStations } from './hooks/useStations';
+import ReplayBanner from './components/common/ReplayBanner';
 
 import { Bot } from 'lucide-react';
 
@@ -54,6 +55,9 @@ function App() {
         dataFreshness={syncTime}
         onRefresh={fetchBaseData}
       />
+
+      {/* Historical replay strip (only visible when an episode is active) */}
+      <ReplayBanner />
 
       {/* Main Container */}
       <div className="flex flex-1 overflow-hidden w-full">

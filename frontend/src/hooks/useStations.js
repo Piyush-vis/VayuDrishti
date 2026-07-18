@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { stationsApi, predictApi, attributionApi } from '../services/api';
+import { useReplay } from '../context/ReplayContext';
 
 export function useStations(selectedStationId, activeCity) {
+  const { replayAtDebounced } = useReplay();
   const [selectedStation, setSelectedStation] = useState(null);
   const [trendReadings, setTrendReadings] = useState([]);
   const [forecast, setForecast] = useState([]);
@@ -28,7 +30,7 @@ export function useStations(selectedStationId, activeCity) {
 
         const pred = await predictApi.forecast(selectedStationId, 72);
         setForecast(pred.predictions);
-        setForecastMeta({ rmse: pred.rmse, modelVersion: pred.model_version });
+        setForecastMeta({ rmse: pred.rmse, modelVersion: pred.model_version, provenance: pred.provenance, asOf: pred.as_of });
 
         const attr = await attributionApi.sources(activeCity, st.zone);
         setAttributions(attr);
@@ -38,7 +40,7 @@ export function useStations(selectedStationId, activeCity) {
     };
 
     loadStationDetails();
-  }, [selectedStationId, activeCity]);
+  }, [selectedStationId, activeCity, replayAtDebounced]);
 
   return { selectedStation, setSelectedStation, trendReadings, forecast, forecastMeta, attributions };
 }

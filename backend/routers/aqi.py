@@ -1,29 +1,35 @@
 from fastapi import APIRouter, Query, HTTPException
 from backend.models.database import db_helper
+from backend.services.replay import parse_at
 from datetime import datetime, timedelta
 from typing import List
 
 router = APIRouter(prefix="/aqi", tags=["aqi"])
 
 @router.get("/current")
-async def get_current_aqi(city: str):
+async def get_current_aqi(city: str, at: str = Query(default=None, description="ISO timestamp for historical replay mode")):
     """
     Get the most recent AQI and pollutant readings for all active stations in a city.
+    With `at`, returns readings as of that historical timestamp (replay mode).
     """
     try:
+        at_dt = parse_at(at)
         # Find all active stations in city
         cursor = db_helper.stations.find({"city": city.lower(), "active": True})
         stations = await cursor.to_list(length=100)
-        
+
         results = []
         for station in stations:
             station_id = station["station_id"]
-            # Fetch latest reading
+            # Fetch latest reading (at or before `at` in replay mode)
+            query = {"station_id": station_id}
+            if at_dt is not None:
+                query["timestamp"] = {"$lte": at_dt}
             reading = await db_helper.aqi_readings.find_one(
-                {"station_id": station_id},
+                query,
                 sort=[("timestamp", -1)]
             )
-            
+
             if reading:
                 reading["_id"] = str(reading["_id"])
                 results.append({
@@ -41,14 +47,17 @@ async def get_current_aqi(city: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/at")
-async def get_aqi_at_time(city: str, hours_ago: int = Query(0, ge=0, le=168)):
+async def get_aqi_at_time(city: str, hours_ago: int = Query(0, ge=0, le=168), at: str = Query(default=None)):
     """
     Get, for every active station in a city, the real recorded reading closest to
     (now - hours_ago hours). Powers the map's historical timelapse slider with actual
-    stored readings instead of a synthetic approximation.
+    stored readings instead of a synthetic approximation. With `at`, hours_ago is
+    measured backwards from that historical timestamp instead of from now.
     """
     try:
-        target_time = datetime.utcnow().replace(minute=0, second=0, microsecond=0) - timedelta(hours=hours_ago)
+        at_dt = parse_at(at)
+        anchor = (at_dt or datetime.utcnow()).replace(minute=0, second=0, microsecond=0)
+        target_time = anchor - timedelta(hours=hours_ago)
 
         cursor = db_helper.stations.find({"city": city.lower(), "active": True})
         stations = await cursor.to_list(length=100)
@@ -56,7 +65,7 @@ async def get_aqi_at_time(city: str, hours_ago: int = Query(0, ge=0, le=168)):
         results = []
         for station in stations:
             station_id = station["station_id"]
-            if hours_ago == 0:
+            if hours_ago == 0 and at_dt is None:
                 reading = await db_helper.aqi_readings.find_one(
                     {"station_id": station_id},
                     sort=[("timestamp", -1)]
@@ -121,20 +130,24 @@ async def get_historical_aqi(station_id: str, start: str, end: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/heatmap")
-async def get_heatmap_data(city: str):
+async def get_heatmap_data(city: str, at: str = Query(default=None)):
     """
     Get latitude, longitude, and current AQI value for all stations in a city to draw the heatmap overlay.
     """
     try:
+        at_dt = parse_at(at)
         cursor = db_helper.stations.find({"city": city.lower(), "active": True})
         stations = await cursor.to_list(length=100)
-        
+
         heatmap_points = []
         for station in stations:
             station_id = station["station_id"]
-            # Fetch latest reading
+            # Fetch latest reading (as of `at` in replay mode)
+            query = {"station_id": station_id}
+            if at_dt is not None:
+                query["timestamp"] = {"$lte": at_dt}
             reading = await db_helper.aqi_readings.find_one(
-                {"station_id": station_id},
+                query,
                 sort=[("timestamp", -1)]
             )
             if reading:
@@ -149,14 +162,15 @@ async def get_heatmap_data(city: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/compare")
-async def compare_cities(cities: str = Query(..., description="Comma-separated list of cities to compare")):
+async def compare_cities(cities: str = Query(..., description="Comma-separated list of cities to compare"), at: str = Query(default=None)):
     """
     Compare current average AQI and primary pollutants across multiple cities.
     """
     try:
+        at_dt = parse_at(at)
         city_list = [c.strip().lower() for c in cities.split(",") if c.strip()]
         comparison = []
-        
+
         for city in city_list:
             # Get active stations in city
             cursor = db_helper.stations.find({"city": city, "active": True})
@@ -167,11 +181,14 @@ async def compare_cities(cities: str = Query(..., description="Comma-separated l
                 
             station_ids = [s["station_id"] for s in stations]
             
-            # Fetch latest reading for each station
+            # Fetch latest reading for each station (as of `at` in replay mode)
             readings = []
             for s_id in station_ids:
+                query = {"station_id": s_id}
+                if at_dt is not None:
+                    query["timestamp"] = {"$lte": at_dt}
                 r = await db_helper.aqi_readings.find_one(
-                    {"station_id": s_id},
+                    query,
                     sort=[("timestamp", -1)]
                 )
                 if r:

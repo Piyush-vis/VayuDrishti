@@ -3,8 +3,10 @@ import React, { useState, useEffect } from 'react';
 import CityComparisonChart from '../components/charts/CityComparisonChart';
 import AQIBadge from '../components/common/AQIBadge';
 import { aqiApi } from '../services/api';
+import { useReplay } from '../context/ReplayContext';
 
 function Compare() {
+  const { replayAtDebounced } = useReplay();
   const [compareData, setCompareData] = useState([]);
 
   useEffect(() => {
@@ -17,7 +19,7 @@ function Compare() {
       }
     };
     loadCompare();
-  }, []);
+  }, [replayAtDebounced]);
 
   return (
     <motion.div

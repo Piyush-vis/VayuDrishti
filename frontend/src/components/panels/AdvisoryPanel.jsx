@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { advisoryApi } from '../../services/api';
 import { AlertCircle, ShieldAlert, Hammer, RefreshCw } from 'lucide-react';
+import { useReplay } from '../../context/ReplayContext';
 
 const LANGUAGES = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
@@ -12,6 +13,7 @@ const LANGUAGES = [
 ];
 
 const AdvisoryPanel = ({ city, zone, aqiLevel, category }) => {
+  const { replayAtDebounced } = useReplay();
   const [selectedLang, setSelectedLang] = useState('en');
   const [advisories, setAdvisories] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -32,7 +34,7 @@ const AdvisoryPanel = ({ city, zone, aqiLevel, category }) => {
     if (city) {
       fetchAdvisory();
     }
-  }, [city, zone, aqiLevel]);
+  }, [city, zone, aqiLevel, replayAtDebounced]);
 
   const handleRegenerate = async () => {
     setLoading(true);

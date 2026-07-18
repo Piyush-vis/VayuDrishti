@@ -359,7 +359,14 @@ class AttributionService:
 
         fire_count = seasonal_fire_prior(city, now.month)
         evidence_sources["fire_hotspots_detected"] = "modelled:seasonal-prior"
-        if not replay_mode and zone_lat is not None:
+        if replay_mode and zone_lat is not None:
+            # Archived episode fire detections (committed with the replay dataset)
+            from backend.services.replay import replay_service
+            archived = replay_service.fire_count_near(zone_lat, zone_lon, now)
+            if archived is not None:
+                fire_count = archived
+                evidence_sources["fire_hotspots_detected"] = "archived:episode-firms"
+        elif not replay_mode and zone_lat is not None:
             firms_count = await fetch_firms_hotspots(zone_lat, zone_lon, 2.0)
             if firms_count != -1:
                 fire_count = firms_count
@@ -378,12 +385,16 @@ class AttributionService:
         chemistry_source = "measured:station-readings" if chemistry_measured else "default:no-readings"
 
         # ---- Likelihood signatures from measured chemistry + covariates ----
-        veh_raw = traffic_score * 40.0 + avg["no2"] * 0.5 + avg["co"] * 8.0
-        ind_raw = industrial_weight * 12.0 + avg["so2"] * 1.5
+        # Each signal is standardized against its CPCB 24h norm (NO2/SO2: 80,
+        # PM2.5: 60) or a saturating cap before weighting, so shares stay
+        # scale-robust from clean monsoon air through Severe+ episodes instead
+        # of letting whichever absolute concentration is largest swamp the mix.
+        veh_raw = traffic_score + min(avg["no2"] / 80.0, 2.5) + min(avg["co"] / 2.0, 1.0) * 0.5
+        ind_raw = industrial_weight / 3.0 + min(avg["so2"] / 80.0, 2.5)
         pm_ratio = avg["pm10"] / max(1.0, avg["pm25"])
-        con_raw = construction_count * 3.0 + pm_ratio * 15.0
-        bio_raw = fire_count * 1.2 + avg["pm25"] * 0.35
-        oth_raw = 20.0  # regional background / secondary aerosol floor
+        con_raw = construction_count / 9.0 + max(0.0, min(pm_ratio - 0.9, 1.5))
+        bio_raw = min(fire_count, 50) / 25.0 + min(avg["pm25"] / 250.0, 1.0)
+        oth_raw = 1.0  # regional background / secondary aerosol floor
 
         raw = {
             "vehicular": veh_raw, "industrial": ind_raw, "construction": con_raw,
@@ -423,6 +434,7 @@ class AttributionService:
         quality_scores = {
             "live:tomtom": 1.0, "live:nasa-firms": 1.0,
             "measured:station-readings": 0.9,
+            "archived:episode-firms": 0.85,
             "catalog:named-industrial-areas": 0.7,
             "modelled:diurnal-profile": 0.45, "modelled:seasonal-prior": 0.4,
             "static-prior:city-tier": 0.4,

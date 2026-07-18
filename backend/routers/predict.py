@@ -1,16 +1,18 @@
 from fastapi import APIRouter, Query, HTTPException
 from backend.services.prediction import prediction_service
+from backend.services.replay import parse_at
 from backend.models.database import db_helper
 
 router = APIRouter(prefix="/predict", tags=["predict"])
 
 @router.get("/forecast")
-async def get_forecast(station_id: str, hours: int = Query(default=72)):
+async def get_forecast(station_id: str, hours: int = Query(default=72), at: str = Query(default=None)):
     """
-    Get 72-hour AQI prediction for a given station.
+    Get 72-hour AQI prediction for a given station. With `at`, the forecast is
+    computed as of that historical timestamp (replay mode).
     """
     try:
-        forecast_data = await prediction_service.get_forecast_for_station(station_id, hours=hours)
+        forecast_data = await prediction_service.get_forecast_for_station(station_id, hours=hours, at=parse_at(at))
         return forecast_data
     except ValueError as ve:
         raise HTTPException(status_code=404, detail=str(ve))
@@ -18,12 +20,12 @@ async def get_forecast(station_id: str, hours: int = Query(default=72)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/alerts")
-async def get_alerts(city: str, threshold: float = Query(default=300.0)):
+async def get_alerts(city: str, threshold: float = Query(default=300.0), at: str = Query(default=None)):
     """
     Get stations in a city predicted to breach the specified AQI threshold in the next 24-72 hours.
     """
     try:
-        alerts = await prediction_service.get_alerts_for_city(city, threshold=threshold)
+        alerts = await prediction_service.get_alerts_for_city(city, threshold=threshold, at=parse_at(at))
         return alerts
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -11,6 +11,7 @@ from backend.routers import (
     advisory,
     chat,
     data,
+    replay,
 )
 
 @asynccontextmanager
@@ -21,6 +22,13 @@ async def lifespan(app: FastAPI):
     from backend.services.scheduler import start_scheduler
     db_helper.connect()
     await seed_database()
+    # Materialise the Dec 2025 crisis replay episode so a judge's first click on
+    # the scenario switcher never sees an empty chart (idempotent).
+    from backend.services.replay import replay_service
+    try:
+        await replay_service.ensure_episode_seeded("dec2025_delhi_severe")
+    except Exception as e:
+        print(f"[WARNING] Replay episode seeding failed: {e}")
     start_scheduler()
     yield
     # Shutdown tasks
@@ -53,6 +61,7 @@ app.include_router(enforcement.router, prefix=api_prefix)
 app.include_router(advisory.router, prefix=api_prefix)
 app.include_router(chat.router, prefix=api_prefix)
 app.include_router(data.router, prefix=api_prefix)
+app.include_router(replay.router, prefix=api_prefix)
 
 @app.get("/")
 async def root():

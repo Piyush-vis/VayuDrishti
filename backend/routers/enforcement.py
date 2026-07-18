@@ -1,15 +1,17 @@
 from fastapi import APIRouter, HTTPException, Query, Body
 from backend.services.enforcement import enforcement_service
+from backend.services.replay import parse_at
 
 router = APIRouter(prefix="/enforcement", tags=["enforcement"])
 
 @router.get("/actions")
-async def get_actions(city: str):
+async def get_actions(city: str, at: str = Query(default=None)):
     """
     Get prioritized, evidence-backed enforcement action recommendations for a city.
+    With `at`, actions are recomputed as of that historical timestamp (replay mode).
     """
     try:
-        actions = await enforcement_service.get_actions_by_city(city.lower())
+        actions = await enforcement_service.get_actions_by_city(city.lower(), at=parse_at(at))
         return actions
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

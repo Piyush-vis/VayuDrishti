@@ -3,6 +3,7 @@ import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import PredictionChart from '../components/charts/PredictionChart';
 import AlertCard from '../components/common/AlertCard';
+import ProvenanceBadge from '../components/common/ProvenanceBadge';
 
 function Predictions({ selectedStation, forecast, forecastMeta, alerts }) {
   return (
@@ -13,9 +14,15 @@ function Predictions({ selectedStation, forecast, forecastMeta, alerts }) {
       className="space-y-6 w-full"
     >
       <div className="glass-card p-6 space-y-6">
-        <div>
-          <h2 className="text-lg font-bold text-white">72-Hour Predictive AQI Forecast</h2>
-          <p className="text-xs text-slate-400">Autoregressive XGBoost model predicting trends with 80% confidence interval bands</p>
+        <div className="flex justify-between items-start gap-2 flex-wrap">
+          <div>
+            <h2 className="text-lg font-bold text-white">72-Hour Predictive AQI Forecast</h2>
+            <p className="text-xs text-slate-400">Autoregressive XGBoost model predicting trends with 80% confidence interval bands</p>
+          </div>
+          <div className="flex gap-1.5">
+            {forecastMeta?.provenance === 'replay' && <ProvenanceBadge source="replay" />}
+            <ProvenanceBadge source={forecastMeta?.modelVersion} />
+          </div>
         </div>
         
         {selectedStation ? (

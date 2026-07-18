@@ -10,6 +10,7 @@ import WindRose from '../components/charts/WindRose';
 import ProvenanceBadge from '../components/common/ProvenanceBadge';
 import { getAqiCategory, CITIES } from '../utils/constants';
 import { aqiApi } from '../services/api';
+import { useReplay } from '../context/ReplayContext';
 
 // Honest per-covariate source labels — mirrors backend evidence_sources values
 const SOURCE_LABELS = {
@@ -45,6 +46,7 @@ function Dashboard({
     trendReadings,
     attributions
 }) {
+  const { episode } = useReplay();
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showVulnerabilities, setShowVulnerabilities] = useState(false);
   const timelapseRequestId = useRef(0);
@@ -105,7 +107,9 @@ function Dashboard({
           />
         </div>
 
-        <TimeSlider
+        {/* Live timelapse slider is replaced by the global replay scrubber
+            while an episode is active - two time axes would conflict. */}
+        {!episode && <TimeSlider
           onChange={async (val) => {
             if (val === 0) {
               fetchBaseData();
@@ -124,7 +128,7 @@ function Dashboard({
               console.error('Failed to load historical AQI snapshot:', err);
             }
           }}
-        />
+        />}
       </div>
 
       <div className="w-full lg:w-[35%] flex flex-col gap-6 overflow-y-auto pr-1">
