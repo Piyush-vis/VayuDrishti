@@ -69,3 +69,16 @@ Thumbs.db
 # local database folders (if any)
 data/db/
 mongodb_data/
+
+# Internal Agent Metadata & Scratch Notes
+CLAUDE.md
+RULES.md
+MEMORY.md
+plan.md
+.claude/
+.gemini/
+docs/DECISIONS.md
+docs/research/
+*.log
+et_hackathon_strategy.md*
+

@@ -1,6 +1,0 @@
-{
-  "summary":  "Complete, self-contained specification document for VayuDrishti — the ET AI Hackathon 2.0 Phase 2 submission. Contains hackathon context, full problem statement, project architecture, complete API specifications, database schemas, frontend component breakdown, data source URLs and integration code, ML model specs, agent system design, folder structure, environment setup, deliverables checklist, demo video script, and judging strategy. Designed to be readable by both humans and AI coding assistants to build the entire project from this single document.",
-  "updatedAt":  "2026-07-07T20:32:05.743004900Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

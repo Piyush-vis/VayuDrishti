@@ -1,12 +1,13 @@
 # VayuDrishti (वायुदृष्टि)
 ## AI-Powered Urban Air Quality Intelligence Platform
 
-**ET AI Hackathon 2026 — Phase 2 Submission**
-**Problem Statement 5:** AI-Powered Urban Air Quality Intelligence for Smart City Intervention
+**ET AI Hackathon 2.0 — Phase 2 Submission**  
+**Team Name:** Codeonauts  
+**Team Members:** Piyush Vishwakarma (Team Leader), Tejavath Praveen Sai  
+**Problem Statement 5:** AI-Powered Urban Air Quality Intelligence for Smart City Intervention  
+**Repository:** https://github.com/Piyush-vis/VayuDrishti.git  
 
-> This document is a draft ready to paste into Google Docs / Word and export as the
-> submission PDF. Replace the bracketed placeholders (team name, members) before
-> exporting. Everything else describes the system as it actually behaves, verified
+> This document describes the system as it actually behaves, verified
 > against a running instance — not aspirational claims. Every number below traces to
 > a committed artifact, a cited publication, or code a judge can open.
 
