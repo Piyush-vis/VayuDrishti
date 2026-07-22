@@ -5,7 +5,7 @@
 **Team Name:** Codeonauts  
 **Team Members:** Piyush Vishwakarma (Team Leader), Tejavath Praveen Sai  
 **Problem Statement 5:** AI-Powered Urban Air Quality Intelligence for Smart City Intervention  
-**Repository:** https://github.com/Piyush-vis/VayuDrishti.git  
+**Repository:** https://github.com/Piyush-vis/VayuDrishti  
 
 > This document describes the system as it actually behaves, verified
 > against a running instance — not aspirational claims. Every number below traces to

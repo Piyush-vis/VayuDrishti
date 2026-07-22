@@ -5,7 +5,8 @@
 > lands, proves the cause with agency-grade evidence, and quantifies the human
 > stakes — for India's 131 NCAP non-attainment cities.
 
-**ET AI Hackathon 2026 · Problem Statement 5 (Urban Air Quality Intelligence)**
+**ET AI Hackathon 2.0 · Problem Statement 5 (Urban Air Quality Intelligence)**  
+**Team Codeonauts:** Piyush Vishwakarma (Lead), Tejavath Praveen Sai  
 
 | | |
 |---|---|
