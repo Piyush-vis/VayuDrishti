@@ -1,0 +1,50 @@
+{
+  "spacing": {
+    "xs": "4px",
+    "sm": "8px",
+    "md": "16px",
+    "lg": "24px",
+    "xl": "32px",
+    "2xl": "48px",
+    "3xl": "64px"
+  },
+  "borderRadius": {
+    "sm": "6px",
+    "md": "10px",
+    "lg": "16px",
+    "xl": "24px",
+    "full": "9999px"
+  },
+  "typography": {
+    "fontHeading": "'Plus Jakarta Sans', 'Outfit', system-ui, sans-serif",
+    "fontBody": "'Inter', 'Geist Sans', -apple-system, sans-serif",
+    "fontMono": "'JetBrains Mono', 'Geist Mono', monospace",
+    "scale": {
+      "display": { "size": "2.5rem", "lineHeight": "1.1", "letterSpacing": "-0.03em" },
+      "h1": { "size": "2rem", "lineHeight": "1.2", "letterSpacing": "-0.025em" },
+      "h2": { "size": "1.5rem", "lineHeight": "1.3", "letterSpacing": "-0.02em" },
+      "h3": { "size": "1.25rem", "lineHeight": "1.4", "letterSpacing": "-0.015em" },
+      "body": { "size": "0.9375rem", "lineHeight": "1.6", "letterSpacing": "0em" },
+      "caption": { "size": "0.75rem", "lineHeight": "1.5", "letterSpacing": "0.01em" }
+    }
+  },
+  "glassmorphism": {
+    "darkCard": {
+      "background": "rgba(15, 23, 42, 0.7)",
+      "backdropFilter": "blur(16px)",
+      "border": "1px solid rgba(255, 255, 255, 0.08)",
+      "boxShadow": "0 8px 32px 0 rgba(0, 0, 0, 0.37)"
+    },
+    "subtleSurface": {
+      "background": "rgba(30, 41, 59, 0.4)",
+      "backdropFilter": "blur(12px)",
+      "border": "1px solid rgba(255, 255, 255, 0.05)",
+      "boxShadow": "0 4px 20px 0 rgba(0, 0, 0, 0.2)"
+    }
+  },
+  "transitions": {
+    "default": "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+    "smooth": "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+    "spring": "transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)"
+  }
+}

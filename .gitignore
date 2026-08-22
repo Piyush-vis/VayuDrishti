@@ -82,3 +82,13 @@ docs/research/
 *.log
 et_hackathon_strategy.md*
 
+# Antigravity IDE & Agent Temp Artifacts
+.agents/**/__pycache__/
+.agents/**/.pytest_cache/
+.agents/tmp*
+.agents/**/tmp*
+.system_generated/
+.brain/
+.antigravity/
+.agent-memory/
+

@@ -12,6 +12,7 @@ from backend.models.database import db_helper
 FEATURE_LABELS = {
     "aqi_t": "Current AQI", "aqi_t-1": "AQI 1h ago", "aqi_t-3": "AQI 3h ago",
     "aqi_t-6": "AQI 6h ago", "aqi_t-12": "AQI 12h ago", "aqi_t-24": "AQI 24h ago",
+    "aqi_t-168": "AQI 7d ago (same hour)",
     "temperature": "Temperature", "humidity": "Humidity", "wind_speed": "Wind speed",
     "wind_direction": "Wind direction", "precipitation": "Precipitation",
     "hour_of_day": "Hour of day", "day_of_week": "Day of week", "month": "Month",
@@ -28,7 +29,7 @@ METADATA_PATH = os.path.join(ML_DIR, "saved_models", "model_metadata.joblib")
 
 # Feature order the models were trained on (must match ml/train_model.FEATURE_COLUMNS)
 FEATURE_COLUMNS = [
-    "aqi_t", "aqi_t-1", "aqi_t-3", "aqi_t-6", "aqi_t-12", "aqi_t-24",
+    "aqi_t", "aqi_t-1", "aqi_t-3", "aqi_t-6", "aqi_t-12", "aqi_t-24", "aqi_t-168",
     "temperature", "humidity", "wind_speed", "wind_direction", "precipitation",
     "hour_of_day", "day_of_week", "month", "is_weekend",
     "aqi_rolling_mean_6h", "aqi_rolling_std_6h", "aqi_rolling_mean_24h", "aqi_rolling_max_24h",
@@ -78,9 +79,10 @@ class PredictionService:
         aqi_l6 = lag(7, aqi_l3)
         aqi_l12 = lag(13, aqi_l6)
         aqi_l24 = lag(25, aqi_l12)
+        aqi_l168 = lag(169, aqi_l24)  # 7-day same-hour lag; falls back to aqi_l24 if history is short
         return {
             "aqi_t": aqi_t, "aqi_t-1": aqi_l1, "aqi_t-3": aqi_l3, "aqi_t-6": aqi_l6,
-            "aqi_t-12": aqi_l12, "aqi_t-24": aqi_l24,
+            "aqi_t-12": aqi_l12, "aqi_t-24": aqi_l24, "aqi_t-168": aqi_l168,
             "temperature": base.get("temperature") or 25.0,
             "humidity": base.get("humidity") or 60.0,
             "wind_speed": base.get("wind_speed") or 8.0,

@@ -212,53 +212,69 @@ rag_service = ChromaRAG()
 # Main AI response generation function
 async def generate_rag_response(question: str) -> Dict[str, Any]:
     """
-    Search the vector DB for context and answer via Gemini — cached-first so the
-    demo never stalls on a rate limit, with a deterministic snippet fallback.
+    Search the vector DB for context and answer via Groq — cached-first so the
+    demo never stalls on a rate limit, with conversational and deterministic fallbacks.
     """
     from backend.services.llm_cache import llm_cache
 
     # 1. Retrieve matching chunks
     contexts = rag_service.query(question, top_k=4)
+    has_context = bool(contexts)
 
-    if not contexts:
-        return {
-            "answer": "I could not find any relevant regulations in the loaded CPCB documents to answer this question. Please verify if the files are loaded.",
-            "sources": [],
-            "provenance": "none",
-        }
+    if has_context:
+        context_text = "\n\n".join([f"SOURCE: {c['source']}\n{c['text']}" for c in contexts])
+        sources = list(set([c["source"] for c in contexts]))
+    else:
+        context_text = ""
+        sources = ["CPCB & NCAP Policy Framework"]
 
-    context_text = "\n\n".join([f"SOURCE: {c['source']}\n{c['text']}" for c in contexts])
-    sources = list(set([c["source"] for c in contexts]))
+    # 2. Cached-first Groq answer. Cache key = question + retrieved source set,
+    # so an identical question never re-spends quota.
+    async def _call_groq():
+        import groq as groq_sdk
+        client = groq_sdk.AsyncGroq(api_key=settings.GROQ_API_KEY)
+        
+        if has_context:
+            prompt = f"""You are VayuDrishti's AI Air Quality & Regulatory Assistant. Answer questions about Indian air quality policies, CPCB standards, and NCAP using the provided regulatory context.
 
-    # 2. Cached-first Gemini answer. The cache key is the question + retrieved
-    # source set, so an identical question served twice never re-spends quota.
-    async def _call_gemini():
-        from google import genai
-        import asyncio
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        prompt = f"""
-        You are VayuDrishti's regulatory assistant. You answer questions about Indian air quality policies, CPCB standards, and the National Clean Air Programme (NCAP) using ONLY the provided regulatory context.
+CRITICAL GUARDRAIL: You specialize EXCLUSIVELY in Indian air quality intelligence, environmental regulations, CPCB/NAAQS standards, NCAP targets, and smog health precautions.
+- If the user asks an off-topic question (such as general coding, Python/programming, math puzzles, recipes, or unrelated topics), you MUST decline immediately in 1-2 polite sentences: "I specialize exclusively in air quality intelligence, CPCB regulations, and environmental health. I cannot assist with programming or unrelated topics. Please feel free to ask about air quality standards, GRAP stages, or pollution guidelines."
+- NEVER write code or answer off-topic queries, and NEVER cite regulatory documents for off-topic requests.
+- For valid air quality questions, answer accurately based on the context and cite the relevant source document (e.g. NCAP GUIDELINES or NAAQS STANDARDS). Keep it concise (3-4 sentences).
 
-        User Question: {question}
+User Question: {question}
 
-        Regulatory Context:
-        {context_text}
+Regulatory Context:
+{context_text}"""
+        else:
+            prompt = f"""You are VayuDrishti's AI Air Quality & Regulatory Assistant.
 
-        Instructions:
-        - Answer the question accurately based on the provided context.
-        - Cite which document (e.g. NCAP GUIDELINES or NAAQS STANDARDS) the information comes from in your sentences.
-        - Keep your response professional, precise, and within 3-4 sentences.
-        - If the context doesn't contain the answer, say "I cannot find this information in the CPCB standards." and do not guess.
-        """
-        response = await asyncio.to_thread(
-            client.models.generate_content, model="gemini-flash-latest", contents=prompt
+CRITICAL GUARDRAIL: You specialize EXCLUSIVELY in Indian air quality intelligence, environmental regulations, CPCB/NAAQS standards, NCAP targets, and smog health precautions.
+
+User message: {question}
+
+Instructions:
+- If the user is greeting you ('hello', 'hi', 'hey', etc.), greet them warmly, introduce yourself as VayuDrishti's Air Quality & Regulatory Intelligence Assistant, and suggest 2-3 specific air quality topics (e.g. CPCB NAAQS limits, GRAP emergency stages, NCAP reduction targets, or health precautions during smog).
+- If the user asks an air quality, pollution health risk, or policy question, provide an accurate, concise, and helpful explanation (3-4 sentences).
+- If the user asks an off-topic question (such as general coding, programming, math puzzles, recipes, or unrelated subjects), decline politely in 1-2 sentences: "I specialize exclusively in air quality intelligence, CPCB regulations, and environmental health. I cannot assist with programming or unrelated topics. Please feel free to ask about air quality standards, GRAP stages, or pollution guidelines." Do NOT answer off-topic queries."""
+
+        response = await client.chat.completions.create(
+            model="groq/compound",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=512,
         )
-        return {"answer": response.text.strip(), "sources": sources}
+        answer_text = response.choices[0].message.content.strip()
+        # If the assistant declined an off-topic request, don't return regulatory sources
+        res_sources = sources
+        if "I specialize exclusively in" in answer_text or "cannot assist with" in answer_text:
+            res_sources = []
+        return {"answer": answer_text, "sources": res_sources}
 
-    if settings.GEMINI_API_KEY:
+    if settings.GROQ_API_KEY:
         try:
             cached = await llm_cache.get_or_generate(
-                "rag_chat", {"q": question.strip().lower(), "src": sorted(sources)}, _call_gemini
+                "rag_chat_groq", {"q": question.strip().lower(), "src": sorted(sources)}, _call_groq
             )
             if cached["result"]:
                 return {
@@ -267,12 +283,19 @@ async def generate_rag_response(question: str) -> Dict[str, Any]:
                     "cached_at": cached.get("cached_at"),
                 }
         except Exception as e:
-            print(f"Error calling Gemini in RAG: {e}. Using snippet fallback.")
+            print(f"Error calling Groq in RAG: {e}. Using snippet fallback.")
 
-    # 3. Deterministic fallback: return the best snippet directly.
-    best_match = contexts[0]
-    return {
-        "answer": f"According to the {best_match['source']} guidelines:\n\n{best_match['text']}",
-        "sources": sources,
-        "provenance": "retrieval-only",
-    }
+    # 3. Deterministic fallback
+    if has_context:
+        best_match = contexts[0]
+        return {
+            "answer": f"According to the {best_match['source']} guidelines:\n\n{best_match['text']}",
+            "sources": sources,
+            "provenance": "retrieval-only",
+        }
+    else:
+        return {
+            "answer": "Hello! I am VayuDrishti's Air Quality & Regulatory Assistant. You can ask me about CPCB NAAQS standards, GRAP emergency measures, NCAP targets, or health precautions during high pollution episodes.",
+            "sources": ["CPCB Guidelines"],
+            "provenance": "template",
+        }

@@ -22,6 +22,7 @@ built on top of the same primitives:
 Both agents degrade to the existing deterministic/template logic if GEMINI_API_KEY is
 absent or any step fails - preserving the resilience the rest of the app already has.
 """
+import asyncio
 import json
 from typing import Any, Dict, List, Optional
 
@@ -32,18 +33,18 @@ _llm = None
 try:
     from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage, AIMessage
     from langchain_core.tools import tool
-    from langchain_google_genai import ChatGoogleGenerativeAI
+    from langchain_groq import ChatGroq
     _AGENTS_AVAILABLE = True
 except Exception as e:  # pragma: no cover - environment without langchain installed
-    print(f"[agents] LangChain/Gemini agent stack unavailable ({e}). Agentic features disabled.")
+    print(f"[agents] LangChain/Groq agent stack unavailable ({e}). Agentic features disabled.")
 
 
 def _get_llm(temperature: float = 0.3):
     global _llm
-    if _llm is None and _AGENTS_AVAILABLE and settings.GEMINI_API_KEY:
-        _llm = ChatGoogleGenerativeAI(
-            model="gemini-flash-latest",
-            google_api_key=settings.GEMINI_API_KEY,
+    if _llm is None and _AGENTS_AVAILABLE and settings.GROQ_API_KEY:
+        _llm = ChatGroq(
+            model="openai/gpt-oss-120b",
+            groq_api_key=settings.GROQ_API_KEY,
             temperature=temperature,
         )
     return _llm
@@ -114,6 +115,9 @@ async def _run_tool_calling_agent(
     LangChain's 0.2 -> 0.3 -> 1.0 releases. The loop itself IS the agent: the model
     decides which tool(s) to call and in what order, observes results, and may call
     further tools before answering - genuine multi-step tool orchestration.
+
+    Includes 429/503 retry with exponential backoff so free-tier quota bursts
+    (5 req/min) don't propagate as errors to the caller.
     """
     llm = _get_llm(temperature=temperature)
     if llm is None:
@@ -123,8 +127,25 @@ async def _run_tool_calling_agent(
     tools_by_name = {t.name: t for t in tools}
     messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
 
+    async def _invoke_with_retry(msgs, max_retries=3):
+        """Invoke LLM with exponential backoff on 429/503."""
+        delay = 20.0
+        for attempt in range(max_retries + 1):
+            try:
+                return await bound_llm.ainvoke(msgs)
+            except Exception as e:
+                err_str = str(e)
+                is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
+                is_unavailable = "503" in err_str or "UNAVAILABLE" in err_str
+                if (is_rate_limit or is_unavailable) and attempt < max_retries:
+                    wait = min(delay * (2 ** attempt), 60.0)
+                    print(f"[agents] Gemini {429 if is_rate_limit else 503} — retrying in {wait:.0f}s (attempt {attempt+1}/{max_retries})")
+                    await asyncio.sleep(wait)
+                else:
+                    raise
+
     for _ in range(max_steps):
-        ai_msg = await bound_llm.ainvoke(messages)
+        ai_msg = await _invoke_with_retry(messages)
         messages.append(ai_msg)
 
         tool_calls = getattr(ai_msg, "tool_calls", None)
@@ -144,7 +165,7 @@ async def _run_tool_calling_agent(
 
     # Ran out of steps without a final answer - force one final response.
     messages.append(HumanMessage(content="Give your final answer now, based on everything gathered so far."))
-    final = await bound_llm.ainvoke(messages)
+    final = await _invoke_with_retry(messages)
     return _message_text(final.content)
 
 

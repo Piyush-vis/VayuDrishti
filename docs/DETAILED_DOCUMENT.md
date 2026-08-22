@@ -399,10 +399,10 @@ This section exists because judges should know exactly what is real:
 
 ## 12. Team
 
-- **Team Name:** [Your Team Name]
-- **Members:** [Name 1 — role], [Name 2 — role], [Name 3 — role], [Name 4 — role]
-- **Competition:** Economic Times AI Hackathon 2026, Phase 2
-- **Repository:** [GitHub URL]
+- **Team Name:** Codeonauts
+- **Members:** Piyush Vishwakarma (Team Leader), Tejavath Praveen Sai (Team Member)
+- **Competition:** Economic Times AI Hackathon 2.0, Phase 2
+- **Repository:** https://github.com/Piyush-vis/VayuDrishti
 
 ## 13. References
 

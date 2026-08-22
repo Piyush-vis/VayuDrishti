@@ -1,0 +1,40 @@
+{
+  "palettes": [
+    {
+      "id": "emerald-cyber",
+      "name": "Emerald Cyber (Eco / Environmental Tech)",
+      "canvas": "#080c10",
+      "surface": "#0f1722",
+      "cardBorder": "rgba(255, 255, 255, 0.08)",
+      "primary": "#10b981",
+      "secondary": "#06b6d4",
+      "textPrimary": "#f8fafc",
+      "textMuted": "#94a3b8",
+      "alert": "#f43f5e"
+    },
+    {
+      "id": "obsidian-amber",
+      "name": "Obsidian Amber (Industrial / Analytics)",
+      "canvas": "#0c0a09",
+      "surface": "#1c1917",
+      "cardBorder": "rgba(255, 255, 255, 0.06)",
+      "primary": "#f59e0b",
+      "secondary": "#3b82f6",
+      "textPrimary": "#fafaf9",
+      "textMuted": "#a8a29e",
+      "alert": "#ef4444"
+    },
+    {
+      "id": "deep-indigo-glass",
+      "name": "Deep Indigo Glass (SaaS Dashboard)",
+      "canvas": "#0b0f19",
+      "surface": "rgba(30, 41, 59, 0.5)",
+      "cardBorder": "rgba(255, 255, 255, 0.1)",
+      "primary": "#6366f1",
+      "secondary": "#ec4899",
+      "textPrimary": "#ffffff",
+      "textMuted": "#94a3b8",
+      "alert": "#fb7185"
+    }
+  ]
+}

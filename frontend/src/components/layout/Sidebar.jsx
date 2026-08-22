@@ -89,8 +89,8 @@ const Sidebar = () => {
       </div>
 
       <div className="p-4 border-t border-slate-800/80 bg-slate-950/20 text-center">
-        <p className="text-[10px] text-slate-500 font-medium">ET AI HACKATHON 2.0</p>
-        <p className="text-[9px] text-slate-600 font-mono mt-0.5">Prototype Submission</p>
+        <p className="text-[10px] text-slate-500 font-medium"></p>
+        <p className="text-[9px] text-slate-600 font-mono mt-0.5"></p>
       </div>
     </aside>
   );

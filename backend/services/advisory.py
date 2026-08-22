@@ -2,21 +2,20 @@ import json
 import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
-from google import genai
+import groq as groq_sdk
 from backend.config import settings
 from backend.models.database import db_helper
 from backend.services.data_ingestion import CITIES_COORDS
+from backend.services.llm_cache import llm_cache
 
-# google.generativeai is deprecated in favor of the unified google-genai SDK (already
-# an installed dependency via langchain-google-genai) - a lazily-created client avoids
-# constructing one when no API key is configured.
-_gemini_client = None
+# Lazily-created Groq async client — constructed only when GROQ_API_KEY is set.
+_groq_client = None
 
-def _get_gemini_client():
-    global _gemini_client
-    if _gemini_client is None and settings.GEMINI_API_KEY:
-        _gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    return _gemini_client
+def _get_groq_client():
+    global _groq_client
+    if _groq_client is None and settings.GROQ_API_KEY:
+        _groq_client = groq_sdk.AsyncGroq(api_key=settings.GROQ_API_KEY)
+    return _groq_client
 
 # Comprehensive local template warnings for multi-language fallback
 LOCAL_ADVISORY_TEMPLATES = {
@@ -259,27 +258,38 @@ class AdvisoryService:
             exists["provenance"] = "cached"
             return exists
 
-        # Try the tool-calling Citizen Advisory Agent first (it can look up nearby
-        # vulnerable locations itself for severe conditions), then the raw single-shot
-        # Gemini prompt, then static templates - each a strictly more resilient fallback.
+        # Try the tool-calling Citizen Advisory Agent first, then the raw single-shot
+        # Groq prompt, then static templates — each a strictly more resilient fallback.
+        # All LLM paths go through llm_cache to prevent 429 storms.
         advisories = None
         source = "template"
-        if settings.GEMINI_API_KEY:
+        if settings.GROQ_API_KEY:
+            cache_payload = {"city": city.lower(), "zone": zone, "category": category, "pollutants": sorted(pollutants_list)}
             try:
                 from backend.services.agents import generate_citizen_advisory_agentic
-                advisories = await generate_citizen_advisory_agentic(city, zone, avg_aqi, category, pollutants_list)
+                cached = await llm_cache.get_or_generate(
+                    namespace="citizen_advisory_agent_groq",
+                    payload=cache_payload,
+                    generator=lambda: generate_citizen_advisory_agentic(city, zone, avg_aqi, category, pollutants_list),
+                )
+                advisories = cached.get("result")
                 if advisories:
-                    source = "agent"
+                    source = "agent" if cached["source"] == "live" else "agent:cached"
             except Exception as e:
-                print(f"Citizen Advisory Agent failed: {e}. Falling back to single-shot Gemini prompt.")
+                print(f"Citizen Advisory Agent failed: {e}. Falling back to single-shot Groq prompt.")
 
             if not advisories:
                 try:
-                    advisories = await self._generate_gemini_advisory(city, zone, avg_aqi, category, pollutants_list)
+                    cached = await llm_cache.get_or_generate(
+                        namespace="citizen_advisory_groq",
+                        payload=cache_payload,
+                        generator=lambda: self._generate_groq_advisory(city, zone, avg_aqi, category, pollutants_list),
+                    )
+                    advisories = cached.get("result")
                     if advisories:
-                        source = "gemini"
+                        source = "groq" if cached["source"] == "live" else "groq:cached"
                 except Exception as e:
-                    print(f"Gemini advisory generation failed: {e}. Falling back to templates.")
+                    print(f"Groq advisory generation failed: {e}. Falling back to templates.")
 
         if not advisories:
             advisories = LOCAL_ADVISORY_TEMPLATES[category]
@@ -301,64 +311,58 @@ class AdvisoryService:
 
         return payload
 
-    async def _generate_gemini_advisory(self, city: str, zone: str, aqi: float, category: str, pollutants: List[str]) -> Dict[str, Any]:
+    async def _generate_groq_advisory(self, city: str, zone: str, aqi: float, category: str, pollutants: List[str]) -> Dict[str, Any]:
         """
-        Use Gemini 1.5 Flash to generate localized, multi-language health advisories in JSON.
+        Use Groq (groq/compound) to generate localized, multi-language health advisories in JSON.
         """
-        client = _get_gemini_client()
+        client = _get_groq_client()
 
         prompt = f"""
-        You are an advanced air quality health advisory system for Indian cities.
-        
-        Current conditions:
-        - City: {city}
-        - Zone: {zone}
-        - AQI: {aqi:.0f} ({category})
-        - Primary pollutants: {', '.join(pollutants)}
-        
-        Generate health advisories for these target groups:
-        1. "general": General public
-        2. "vulnerable": Vulnerable populations (elderly, children, lung/heart patients)
-        3. "outdoor_workers": Outdoor workers (construction, street vendors, delivery agents, traffic police)
-        
-        Generate each advisory in these 6 languages:
-        - "en": English
-        - "hi": Hindi (हिंदी)
-        - "ta": Tamil (தமிழ்)
-        - "kn": Kannada (ಕನ್ನಡ)
-        - "bn": Bengali (বাংলা)
-        - "te": Telugu (తెలుగు)
-        
-        Instructions:
-        - Keep each advisory extremely concise (under 2 short sentences).
-        - Be specific, actionable, and culturally relevant to India (e.g. mention masks, shading, air purifiers as appropriate).
-        - Return ONLY a valid JSON object matching this structure:
-        {{
-            "general": {{
-                "en": "...", "hi": "...", "ta": "...", "kn": "...", "bn": "...", "te": "..."
-            }},
-            "vulnerable": {{
-                "en": "...", "hi": "...", "ta": "...", "kn": "...", "bn": "...", "te": "..."
-            }},
-            "outdoor_workers": {{
-                "en": "...", "hi": "...", "ta": "...", "kn": "...", "bn": "...", "te": "..."
-            }}
-        }}
-        Do not include markdown tags, code blocks, or triple backticks in your output. Just output the raw JSON string.
-        """
-        
-        response = await asyncio.to_thread(
-            client.models.generate_content, model="gemini-flash-latest", contents=prompt
+You are an advanced air quality health advisory system for Indian cities.
+
+Current conditions:
+- City: {city}
+- Zone: {zone}
+- AQI: {aqi:.0f} ({category})
+- Primary pollutants: {', '.join(pollutants)}
+
+Generate health advisories for these target groups:
+1. "general": General public
+2. "vulnerable": Vulnerable populations (elderly, children, lung/heart patients)
+3. "outdoor_workers": Outdoor workers (construction, street vendors, delivery agents, traffic police)
+
+Generate each advisory in these 6 languages:
+- "en": English
+- "hi": Hindi
+- "ta": Tamil
+- "kn": Kannada
+- "bn": Bengali
+- "te": Telugu
+
+Instructions:
+- Keep each advisory extremely concise (under 2 short sentences).
+- Be specific, actionable, and culturally relevant to India.
+- Return ONLY a valid JSON object with no markdown, no code blocks:
+{{"general": {{"en": "...", "hi": "...", "ta": "...", "kn": "...", "bn": "...", "te": "..."}}, "vulnerable": {{"en": "...", "hi": "...", "ta": "...", "kn": "...", "bn": "...", "te": "..."}}, "outdoor_workers": {{"en": "...", "hi": "...", "ta": "...", "kn": "...", "bn": "...", "te": "..."}}}}
+"""
+
+        response = await client.chat.completions.create(
+            model="groq/compound",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=1024,
         )
-        text = response.text.strip()
-        
-        # Clean up any potential markdown wraps
+        text = response.choices[0].message.content.strip()
+
+        # Clean up any markdown wraps
         if text.startswith("```json"):
             text = text[7:]
+        if text.startswith("```"):
+            text = text[3:]
         if text.endswith("```"):
             text = text[:-3]
         text = text.strip()
-        
+
         return json.loads(text)
 
     async def get_vulnerability_map_data(self, city: str) -> List[Dict[str, Any]]:

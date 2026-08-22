@@ -11,7 +11,7 @@ from sklearn.metrics import root_mean_squared_error
 os.makedirs(os.path.join(os.path.dirname(__file__), "saved_models"), exist_ok=True)
 
 FEATURE_COLUMNS = [
-    "aqi_t", "aqi_t-1", "aqi_t-3", "aqi_t-6", "aqi_t-12", "aqi_t-24",
+    "aqi_t", "aqi_t-1", "aqi_t-3", "aqi_t-6", "aqi_t-12", "aqi_t-24", "aqi_t-168",
     "temperature", "humidity", "wind_speed", "wind_direction", "precipitation",
     "hour_of_day", "day_of_week", "month", "is_weekend",
     "aqi_rolling_mean_6h", "aqi_rolling_std_6h", "aqi_rolling_mean_24h", "aqi_rolling_max_24h",
@@ -61,6 +61,7 @@ def _engineer_features(df: pd.DataFrame, horizons=None) -> pd.DataFrame:
         g["aqi_t-6"] = g["aqi"].shift(6)
         g["aqi_t-12"] = g["aqi"].shift(12)
         g["aqi_t-24"] = g["aqi"].shift(24)
+        g["aqi_t-168"] = g["aqi"].shift(168)  # 7-day same-hour lag (weekly seasonality)
         g["aqi_rolling_mean_6h"] = g["aqi"].rolling(6, min_periods=1).mean()
         g["aqi_rolling_std_6h"] = g["aqi"].rolling(6, min_periods=1).std().fillna(0.0)
         g["aqi_rolling_mean_24h"] = g["aqi"].rolling(24, min_periods=1).mean()
@@ -80,7 +81,8 @@ def _engineer_features(df: pd.DataFrame, horizons=None) -> pd.DataFrame:
         engineered_groups.append(g)
 
     result = pd.concat(engineered_groups, ignore_index=True)
-    result = result.dropna(subset=["aqi_t-24"]).reset_index(drop=True)
+    # aqi_t-168 is the longest lag; rows without it also lack all shorter lags.
+    result = result.dropna(subset=["aqi_t-168"]).reset_index(drop=True)
     # Back-compat: the default single-horizon call (no `horizons` passed) returns
     # only rows with a defined target, as the original pipeline did. Multi-horizon
     # callers keep all rows and drop per-target themselves.

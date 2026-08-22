@@ -1,0 +1,11 @@
+{
+  "description": "Workspace automation hooks for code quality, formatting, and safety checks.",
+  "hooks": {
+    "post_tool_execution": [
+      {
+        "matcher": "replace_file_content|write_to_file",
+        "description": "Ensure files are valid and adhere to formatting rules without breaking working code."
+      }
+    ]
+  }
+}

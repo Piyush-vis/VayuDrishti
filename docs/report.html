@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VayuDrishti — Executive Submission Report | ET AI Hackathon 2.0</title>
+  
+  <!-- Premium Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --bg-card: #111827;
+      --bg-card-alt: #1e293b;
+      --text-main: #334155;
+      --text-dark: #0f172a;
+      --text-muted: #64748b;
+      
+      --accent-blue: #2563eb;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-purple: #8b5cf6;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      
+      --gradient-primary: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+      --gradient-accent: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      --gradient-emerald: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      --gradient-amber: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #1e293b;
+      background-color: #f1f5f9;
+      line-height: 1.65;
+      font-size: 14px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    .report-container {
+      max-width: 960px;
+      margin: 40px auto;
+      background: #ffffff;
+      padding: 60px 65px;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.08), 0 0 1px 1px rgba(15, 23, 42, 0.05);
+    }
+
+    /* Cover / Hero Header */
+    .hero-header {
+      background: var(--gradient-primary);
+      color: #ffffff;
+      padding: 42px 45px;
+      border-radius: 14px;
+      margin-bottom: 40px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.3);
+    }
+
+    .hero-header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, rgba(139, 92, 246, 0.05) 50%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .brand-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      background: rgba(59, 130, 246, 0.2);
+      border: 1px solid rgba(96, 165, 250, 0.4);
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #93c5fd;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 16px;
+    }
+
+    .hero-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 36px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: -0.8px;
+      line-height: 1.15;
+      margin-bottom: 8px;
+    }
+
+    .hero-subtitle {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      background: linear-gradient(90deg, #60a5fa, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 25px;
+    }
+
+    /* Metadata Bar */
+    .metadata-bar {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px 24px;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      padding: 16px 20px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 12.5px;
+      margin-bottom: 25px;
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .meta-label {
+      color: #94a3b8;
+      font-weight: 600;
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .meta-val {
+      color: #f8fafc;
+      font-weight: 600;
+    }
+
+    .meta-val a {
+      color: #60a5fa;
+      text-decoration: none;
+      font-family: 'Fira Code', monospace;
+      font-size: 11.5px;
+    }
+
+    /* Quick Highlight Metric Grid */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-number {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 800;
+      color: #38bdf8;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: #cbd5e1;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+    }
+
+    /* Typography & Sections */
+    h2.section-header {
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text-dark);
+      margin-top: 42px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2.5px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      letter-spacing: -0.4px;
+      page-break-after: avoid;
+    }
+
+    h2.section-header::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 22px;
+      background: var(--gradient-accent);
+      border-radius: 4px;
+    }
+
+    h3.subsection-header {
+      font-family: 'Outfit', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 26px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      page-break-after: avoid;
+    }
+
+    p {
+      margin-bottom: 14px;
+      color: #334155;
+      line-height: 1.7;
+    }
+
+    strong {
+      color: #0f172a;
+      font-weight: 600;
+    }
+
+    /* Inline Badges & File Badges */
+    .file-badge {
+      font-family: 'Fira Code', monospace;
+      font-size: 11px;
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 2px 7px;
+      border-radius: 5px;
+      border: 1px solid #cbd5e1;
+      font-weight: 500;
+    }
+
+    .badge-live { background: #dcfce7; color: #166534; border: 1px solid #86efac; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+    .badge-replay { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+    .badge-model { background: #e0e7ff; color: #3730a3; border: 1px solid #a5b4fc; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+
+    /* Callouts */
+    .callout-box {
+      background: #f0f9ff;
+      border-left: 4.5px solid #0284c7;
+      padding: 16px 20px;
+      border-radius: 0 10px 10px 0;
+      margin: 22px 0;
+      font-size: 13.5px;
+      color: #0369a1;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.05);
+    }
+
+    .callout-accent {
+      background: #fef2f2;
+      border-left: 4.5px solid #ef4444;
+      color: #b91c1c;
+    }
+
+    .callout-emerald {
+      background: #ecfdf5;
+      border-left: 4.5px solid #10b981;
+      color: #047857;
+    }
+
+    /* Flow Chain Diagram Card */
+    .chain-card {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 24px;
+      border-radius: 12px;
+      margin: 24px 0;
+      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.2);
+    }
+
+    .chain-card strong {
+      color: #ffffff;
+    }
+
+    .chain-step {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 13px;
+      color: #e2e8f0;
+    }
+
+    .chain-step:last-child {
+      border-bottom: none;
+    }
+
+    .chain-num {
+      width: 26px;
+      height: 26px;
+      background: #3b82f6;
+      color: #ffffff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 11px;
+      shrink: 0;
+    }
+
+    /* Tables */
+    .table-wrapper {
+      width: 100%;
+      margin: 22px 0;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      text-align: left;
+    }
+
+    thead {
+      background: #f8fafc;
+    }
+
+    th {
+      padding: 12px 16px;
+      font-weight: 700;
+      color: #0f172a;
+      border-bottom: 2px solid #cbd5e1;
+      text-transform: uppercase;
+      font-size: 10.5px;
+      letter-spacing: 0.6px;
+    }
+
+    td {
+      padding: 11px 16px;
+      border-bottom: 1px solid #e2e8f0;
+      color: #334155;
+    }
+
+    tbody tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
+    tbody tr:hover {
+      background-color: #f1f5f9;
+    }
+
+    /* Capabilities Grid Layout */
+    .capabilities-grid {
+      display: grid;
+      grid-template-columns: repeat(1, 1fr);
+      gap: 18px;
+      margin: 24px 0;
+    }
+
+    .cap-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 18px 22px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
+      transition: all 0.2s ease;
+    }
+
+    .cap-card:hover {
+      border-color: #93c5fd;
+      box-shadow: 0 8px 20px rgba(59, 130, 246, 0.08);
+    }
+
+    .cap-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    ul, ol {
+      margin-bottom: 18px;
+      padding-left: 22px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    /* Print Controls & PDF Layout Optimizations */
+    @media print {
+      body {
+        background: #ffffff !important;
+      }
+
+      .report-container {
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+
+      .hero-header {
+        background: #0f172a !important;
+        color: #ffffff !important;
+        padding: 30px !important;
+      }
+
+      h2.section-header {
+        page-break-after: avoid;
+      }
+
+      .cap-card, .table-wrapper, .callout-box, .chain-card {
+        page-break-inside: avoid;
+      }
+
+      @page {
+        margin: 1.5cm;
+        size: A4 portrait;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="report-container">
+  
+  <!-- HERO COVER BANNER -->
+  <header class="hero-header">
+    <div class="brand-tag">ET AI Hackathon 2.0 • Phase 2 Submission</div>
+    <h1 class="hero-title">VayuDrishti (वायुदृष्टि)</h1>
+    <div class="hero-subtitle">AI-Powered Urban Air Quality Intelligence Platform</div>
+    
+    <div class="metadata-bar">
+      <div class="meta-item"><span class="meta-label">Team Name:</span> <span class="meta-val">Codeonauts</span></div>
+      <div class="meta-item"><span class="meta-label">Problem Statement:</span> <span class="meta-val">PS-5 (Urban Air Quality)</span></div>
+      <div class="meta-item"><span class="meta-label">Team Leader:</span> <span class="meta-val">Piyush Vishwakarma</span></div>
+      <div class="meta-item"><span class="meta-label">Team Member:</span> <span class="meta-val">Tejavath Praveen Sai</span></div>
+      <div class="meta-item" style="grid-column: span 2;"><span class="meta-label">Repository:</span> <span class="meta-val"><a href="https://github.com/Piyush-vis/VayuDrishti" target="_blank">github.com/Piyush-vis/VayuDrishti</a></span></div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-number">+28.4%</div>
+        <div class="stat-label">Forecast RMSE Gain</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">24–48h</div>
+        <div class="stat-label">Proactive GRAP Lead</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">500+</div>
+        <div class="stat-label">Live CPCB Stations</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">57 / 57</div>
+        <div class="stat-label">Pytest Tests Passed</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 1. PROBLEM ANALYSIS -->
+  <section>
+    <h2 class="section-header">1. Problem Analysis</h2>
+    <p>India's air quality crisis is a national, not regional, problem. The Lancet estimates <strong>1.67 million premature deaths annually</strong> from air pollution in India; Dalberg/CII put the economic cost at <strong>~$95B per year — roughly 3% of GDP</strong>. In 2024-25, Delhi averaged an AQI of 218 ("Poor" or worse for 200+ days); Mumbai recorded dangerous AQI on 60+ days; Bengaluru and Chennai — historically cleaner metros — are measurably deteriorating as vehicle density and construction activity surge.</p>
+    
+    <p>The gap is not data — India has deployed 900+ CAAQMS stations under NCAP, and the official real-time feed is published on <code>data.gov.in</code>. The gap is <strong>execution between the reading and the response</strong>:</p>
+    
+    <div class="callout-box callout-accent">
+      <strong>The Key Systemic Failures:</strong>
+      <ol style="margin-top: 8px; margin-bottom: 0;">
+        <li><strong>The government's own graded-response policy is executed reactively.</strong> CAQM's Graded Response Action Plan (GRAP) states its stages "shall be invoked <strong>in advance</strong>" based on forecasts. Yet <strong>13 of 17 GRAP invocations in winter 2025-26 were reactive</strong> (ThePrint/CEEW). The concrete failure: on <strong>10 Nov 2025 Delhi hit AQI 362; GRAP Stage III came only on 11 Nov, at 425+</strong> — more than 24 hours after the signal, at the cost of a full day of statutory protections.</li>
+        <li><strong>No source attribution.</strong> Administrators see "AQI 320" but not <em>why</em> — traffic, an industrial stack, construction dust, or crop burning upwind? Without that, enforcement is a guess. Only Delhi buys real-time apportionment today (DPCC pays IIT-Kanpur crores for it); the other cities get nothing.</li>
+        <li><strong>No actionable forecasting.</strong> Only <strong>8 of the 131 NCAP non-attainment cities</strong> have any early-warning system. Response is keyed to what a sensor reads <em>now</em>, not to what conditions will be in 24-72 hours, when interventions (truck bans, construction halts, school closures) could still be scheduled to matter.</li>
+        <li><strong>No correlation across signals.</strong> A single elevated PM2.5 reading looks the same whether it is a transient blip or the leading edge of a genuine compound event (breach + worsening forecast + a dominant, matching source). No tool in common use makes that distinction automatically.</li>
+      </ol>
+    </div>
+
+    <p><strong>The sharpest framing of the opportunity:</strong> India already wrote the policy that responds to forecasts. It fails to execute it on time. That is an automation problem — and automation is what this platform does.</p>
+  </section>
+
+  <!-- 2. SOLUTION OVERVIEW -->
+  <section>
+    <h2 class="section-header">2. Solution Overview — One Chain, One Win</h2>
+    <p>VayuDrishti is a full-stack platform (FastAPI + React/Leaflet + MongoDB + XGBoost + LangChain/Gemini) built around a single spine — every feature is a link in one chain, which is also the demo's war-room flow:</p>
+    
+    <div class="chain-card">
+      <div style="font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; color: #60a5fa; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.8px;">The War Room Operational Chain</div>
+      
+      <div class="chain-step">
+        <div class="chain-num">1</div>
+        <div><strong>Forecast sees the crisis coming:</strong> 24–72h multi-horizon XGBoost forecaster beats persistence at every horizon.</div>
+      </div>
+      
+      <div class="chain-step">
+        <div class="chain-num">2</div>
+        <div><strong>GRAP Automation drafts statutory order:</strong> Drafts Stage III/IV orders BEFORE threshold crossing (24-48h lead time).</div>
+      </div>
+      
+      <div class="chain-step">
+        <div class="chain-num">3</div>
+        <div><strong>Evidence attached:</strong> CPF wind-sector source attribution + 570km HYSPLIT-lite back-trajectories over active Punjab crop fires.</div>
+      </div>
+      
+      <div class="chain-step">
+        <div class="chain-num">4</div>
+        <div><strong>Human impact quantified:</strong> People exposed, AQLI life-years lost, WHO AirQ+ daily excess deaths averted.</div>
+      </div>
+      
+      <div class="chain-step">
+        <div class="chain-num">5</div>
+        <div><strong>Citizens alerted in regional languages:</strong> Multi-lingual TTS voice advisories (Hindi, Tamil, Bengali, Telugu, Kannada).</div>
+      </div>
+      
+      <div class="chain-step" style="background: rgba(16, 185, 129, 0.25); margin-top: 12px; padding: 12px 16px; border-radius: 8px; border: 1px solid rgba(52, 211, 153, 0.5); color: #ecfdf5;">
+        <div class="chain-num" style="background: #10b981; color: #ffffff;">✓</div>
+        <div style="color: #ecfdf5;"><strong style="color: #6ee7b7 !important;">Result:</strong> Signal → drafted statutory intervention in <strong style="color: #34d399 !important; font-size: 14px;">seconds</strong>, vs the documented <strong style="color: #fca5a5 !important;">>24h government lag</strong>.</div>
+      </div>
+    </div>
+
+    <p>Everything runs with <strong>zero API keys</strong> (physically-grounded simulator + deterministic rule fallbacks + in-memory database fallback), and every panel carries a provenance badge (<span class="badge-live">LIVE</span> <span class="badge-replay">HISTORICAL REPLAY</span> <span class="badge-model">MODELLED</span>) so nothing is faked.</p>
+  </section>
+
+  <!-- 3. TEN SHIPPED CAPABILITIES -->
+  <section>
+    <h2 class="section-header">3. The Ten Shipped Capabilities</h2>
+
+    <div class="capabilities-grid">
+      
+      <!-- 3.1 -->
+      <div class="cap-card">
+        <div class="cap-title">
+          <span>3.1 Forecast-Triggered GRAP Automation Engine</span>
+          <span class="file-badge">backend/services/grap.py</span>
+        </div>
+        <p>A rules layer over the forecaster using official CAQM stage thresholds (<strong>Stage I 201-300 · II 301-400 · III 401-450 · IV >450</strong>). The trigger is the earliest <em>sustained</em> (≥3h) threshold crossing detected by any of three transparent signals — <strong>observed</strong>, <strong>XGBoost forecast</strong>, or <strong>persistence-with-trend projection</strong>. Auto-generates CAQM-style statutory orders with real action checklists (BS-III petrol/BS-IV diesel ban, C&D halt, truck bans, online classes) tagged to responsible agencies. Endpoints: <code>GET /api/v1/grap/status</code>, <code>/grap/schedule</code>.</p>
+      </div>
+
+      <!-- 3.2 -->
+      <div class="cap-card">
+        <div class="cap-title">
+          <span>3.2 Direct Multi-Horizon Forecaster + TreeSHAP</span>
+          <span class="file-badge">backend/services/prediction.py</span>
+        </div>
+        <p>One XGBoost model <strong>per horizon</strong> (6/12/24/48/72h), each predicting directly and interpolated into the hourly curve. Evaluated on a chronological 14-day holdout against naive persistence ("AQI in Nh = AQI now"):</p>
+        
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>Horizon</th><th>Model RMSE</th><th>Persistence RMSE</th><th>Improvement</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>24 Hours</strong></td><td><strong>13.83</strong></td><td>19.00</td><td><strong style="color: #059669;">+27.2%</strong></td></tr>
+              <tr><td><strong>48 Hours</strong></td><td><strong>13.76</strong></td><td>19.22</td><td><strong style="color: #059669;">+28.4%</strong></td></tr>
+              <tr><td><strong>72 Hours</strong></td><td><strong>13.78</strong></td><td>18.78</td><td><strong style="color: #059669;">+26.6%</strong></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Every forecast ships an <strong>exact TreeSHAP</strong> explanation via XGBoost's native <code>pred_contribs</code> (no external dependency): <em>"forecast +38 AQI: 24h-ago AQI +14, low wind +9, current PM2.5 +11."</em></p>
+      </div>
+
+      <!-- 3.3 -->
+      <div class="cap-card">
+        <div class="cap-title">
+          <span>3.3 CPF Source Attribution with Real Confidence</span>
+          <span class="file-badge">backend/services/attribution.py</span>
+        </div>
+        <p><strong>CPF (Conditional Probability Function) wind-sector probabilities</strong> — the peer-reviewed openair receptor-modelling diagnostic — as statistical backbone, rendered as a polar <strong>pollution rose</strong>. Priors calibrated to published Delhi PMF source-apportionment splits; likelihoods from measured station chemistry. Live covariates are NASA FIRMS + TomTom; every covariate carries a source label (<code>live:</code> / <code>measured:</code> / <code>catalog:</code> / <code>modelled:</code>) with real <code>confidence</code> fields. Zero random inputs.</p>
+      </div>
+
+      <!-- 3.4 -->
+      <div class="cap-card">
+        <div class="cap-title">
+          <span>3.4 HYSPLIT-lite Back-Trajectories × Fire Fusion</span>
+          <span class="file-badge">backend/services/trajectory.py</span>
+        </div>
+        <p>A 2D kinematic back-trajectory integrating air parcels backward hour-by-hour through transport wind, intersecting corridors with fire detections: <em>"air mass crossed 10 active Punjab/Haryana fires within 17 hours — 570 km traced"</em> — animated on the map. Endpoint: <code>GET /api/v1/trajectory/back</code>.</p>
+      </div>
+
+      <!-- 3.5 -->
+      <div class="cap-card">
+        <div class="cap-title">
+          <span>3.5 Health & Exposure Impact Engine</span>
+          <span class="file-badge">backend/services/health_impact.py</span>
+        </div>
+        <p>Three cited lenses: <strong>AQLI life-years lost</strong> (EPIC/UChicago, 0.098 life-years per µg/m³ PM2.5, annual-equivalent capped at 130 µg/m³), <strong>WHO AirQ+ short-term mortality</strong> (RR 1.08 per 10 µg/m³ PM2.5, capped at 150 µg/m³), and <strong>population-weighted exposure</strong> (~4.78M people covered across Delhi stations). Converts concentrations to decision language: <em>"protects 4.78M people, averts ~13 deaths/day."</em></p>
+      </div>
+
+      <!-- 3.6 -->
+      <div class="cap-card">
+        <div class="cap-title">
+          <span>3.6 Dec 2025 Crisis Replay</span>
+          <span class="file-badge">backend/services/replay.py</span>
+        </div>
+        <p>A one-click, honestly-labelled <strong>HISTORICAL REPLAY</strong> of the 13-16 Dec 2025 Delhi Severe+ episode (Anand Vihar 644, Wazirpur 635, Mundka 560, Mandir Marg 519) wired through <strong>every</strong> service via an <code>at</code> timestamp parameter. Replay runs are ephemeral and pytest-enforced never to pollute live databases.</p>
+      </div>
+
+      <!-- 3.7 -->
+      <div class="cap-card">
+        <div class="cap-title">
+          <span>3.7 Incident War Room</span>
+          <span class="file-badge">frontend/src/pages/WarRoom.jsx</span>
+        </div>
+        <p>One orchestrated view running the full 6-step pipeline for worst stations with a real wall-clock <strong>"signal → drafted intervention" counter</strong> displayed beside the documented government benchmark (>24h lag).</p>
+      </div>
+
+      <!-- 3.8 -->
+      <div class="cap-card">
+        <div class="cap-title">
+          <span>3.8 Voice / IVR Citizen Channel</span>
+          <span class="file-badge">frontend/src/hooks/useSpeech.js</span>
+        </div>
+        <p>Browser-native TTS in <code>hi-IN</code> / <code>ta-IN</code> / <code>bn-IN</code> / <code>te-IN</code> / <code>kn-IN</code> — zero backend, zero quota — plus a phone-frame IVR preview and WhatsApp mock. CPCB's SAMEER app is English-only; VayuDrishti speaks 6 regional languages.</p>
+      </div>
+
+      <!-- 3.9 -->
+      <div class="cap-card">
+        <div class="cap-title">
+          <span>3.9 Official data.gov.in CPCB Feed Adapter</span>
+          <span class="file-badge">backend/services/gov_feed.py</span>
+        </div>
+        <p>Live adapter for the GoI CAAQMS resource on <code>data.gov.in</code> — verified live: <strong>3,500 records reachable, 500+ CAAQMS stations published nationwide</strong>. Onboarding a city is a config entry, not an integration project.</p>
+      </div>
+
+      <!-- 3.10 -->
+      <div class="cap-card">
+        <div class="cap-title">
+          <span>3.10 Tool-Calling Agents + Compliance RAG</span>
+          <span class="file-badge">backend/services/agents.py</span>
+        </div>
+        <p>Two genuine LangChain <code>bind_tools()</code> agents (Compound-Risk Enforcement Agent & Citizen Advisory Agent) querying ChromaDB RAG over NAAQS/NCAP/AQI standards with TF-IDF fallback and Mongo-backed LLM cache.</p>
+      </div>
+
+      <!-- 3.11 -->
+      <div class="cap-card">
+        <div class="cap-title">
+          <span>3.11 Provenance Badges Everywhere</span>
+          <span class="file-badge">frontend/src/components/common/ProvenanceBadge.jsx</span>
+        </div>
+        <p>Every data panel carries explicit provenance tags (<span class="badge-live">LIVE</span> <span class="badge-replay">HISTORICAL REPLAY</span> <span class="badge-model">MODELLED</span>) ensuring zero fake metrics.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 4. TECHNICAL FOUNDATIONS -->
+  <section>
+    <h2 class="section-header">4. Technical Foundations</h2>
+    <ul>
+      <li><strong>Data Layer</strong> (<code>backend/services/data_ingestion.py</code>): Live AQI from AQICN (with OpenWeatherMap fallback) and Open-Meteo weather (keyless), Indian NAQI computed from CPCB sub-index tables, falling back to a physically-grounded simulator.</li>
+      <li><strong>Scheduler</strong> (<code>backend/services/scheduler.py</code>): APScheduler hourly live ingestion + 65-min enforcement anomaly scans.</li>
+      <li><strong>Database Fallback</strong> (<code>backend/models/database.py</code>): MongoDB via Motor with transparent in-memory <code>MockCollection</code> fallback (<code>$in</code>, <code>$gte</code>, <code>$lte</code>, sorting, indexing).</li>
+      <li><strong>Automated Testing</strong>: <strong>57 pytest tests green</strong> covering calculations, attribution guards, predictions, replay ephemerality, and serialization.</li>
+    </ul>
+  </section>
+
+  <!-- 5. JUDGING CRITERIA MAPPING -->
+  <section>
+    <h2 class="section-header">5. Judging-Criteria & Evaluation-Focus Mapping</h2>
+    
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr><th>Criterion</th><th>Weight</th><th>What Earns It — Feature & Measured Number</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Innovation</strong></td>
+            <td><strong>25%</strong></td>
+            <td>Forecast-triggered GRAP automation (automating policy governments execute reactively) · CPF wind-sector confidence · HYSPLIT-lite trajectory×fire fusion · Replay <code>at</code> architecture.</td>
+          </tr>
+          <tr>
+            <td><strong>Business Impact</strong></td>
+            <td><strong>25%</strong></td>
+            <td>Named buyers (CAQM / 131 NCAP cities) · Documented failure fixed (13/17 reactive) · Existing funding (₹11,211 cr NCAP) · Lives impacted (4.78M covered, ~13 deaths/day averted).</td>
+          </tr>
+          <tr>
+            <td><strong>Technical Excellence</strong></td>
+            <td><strong>20%</strong></td>
+            <td>Direct multi-horizon RMSE vs persistence (+27.2%/+28.4%/+26.6%) · Exact TreeSHAP · Zero-random attribution guard · 57 green tests · Live Swagger docs.</td>
+          </tr>
+          <tr>
+            <td><strong>Scalability</strong></td>
+            <td><strong>15%</strong></td>
+            <td>Official <code>data.gov.in</code> CAAQMS feed (3,500 records, 500+ stations) · Station-agnostic pooled model · Onboarding = config entry.</td>
+          </tr>
+          <tr>
+            <td><strong>User Experience</strong></td>
+            <td><strong>15%</strong></td>
+            <td>Incident War Room stepped flow with live counter · Dec 2025 crisis replay · Regional voice advisories (6 languages) · Dark command-center UI.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="subsection-header">Problem Statement Evaluation Focus</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr><th>PS Evaluation Focus</th><th>Our Implementation</th><th>Measured Evidence</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Attribution Accuracy</strong></td>
+            <td>CPF wind-sector probabilities + PMF-calibrated priors + measured chemistry + FIRMS/TomTom fusion.</td>
+            <td>Every covariate source-labelled; zero random inputs (pytest-enforced).</td>
+          </tr>
+          <tr>
+            <td><strong>Forecast RMSE vs Persistence</strong></td>
+            <td>Direct multi-horizon XGBoost, chronological holdout.</td>
+            <td><strong>24h 13.83 vs 19.00 (+27.2%) · 48h 13.76 vs 19.22 (+28.4%) · 72h 13.78 vs 18.78 (+26.6%)</strong>.</td>
+          </tr>
+          <tr>
+            <td><strong>Enforcement Quality</strong></td>
+            <td>GRAP engine drafts statutory CAQM action checklist with agency tags & lead time.</td>
+            <td>Order records trigger signal; ≥3h sustain rule prevents blips.</td>
+          </tr>
+          <tr>
+            <td><strong>Advisory & Languages</strong></td>
+            <td>Agent-generated advisories naming nearby vulnerable locations in <strong>6 languages</strong> + TTS audio.</td>
+            <td>Incumbent SAMEER app is English-only.</td>
+          </tr>
+          <tr>
+            <td><strong>Response Time Reduction</strong></td>
+            <td>War Room counter: signal ➔ drafted intervention in <strong>seconds</strong> vs <strong>>24h govt lag</strong>.</td>
+            <td>Orders drafted ~14-36h before projected crossings (24-48h before real CAQM order).</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 6. BUSINESS IMPACT & PROCUREMENT -->
+  <section>
+    <h2 class="section-header">6. Business Impact & Procurement</h2>
+    <div class="callout-box callout-emerald">
+      <strong>Financial Context & Available Funding:</strong>
+      <ul style="margin-top: 6px; margin-bottom: 0;">
+        <li><strong>Problem Cost:</strong> ~$95B/yr (≈3% of GDP) and 1.67M deaths/yr (Lancet).</li>
+        <li><strong>Existing Budget:</strong> NCAP has <strong>₹11,211 crore released with ~68% utilised</strong> (Delhi ~20%). Performance-linked funding across 131 cities is money waiting for this early-warning layer.</li>
+        <li><strong>Procurement Precedent:</strong> State bodies already pay for this — <strong>DPCC pays IIT-Kanpur crores for real-time apportionment</strong> in Delhi. VayuDrishti generalizes this for all NCAP cities.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 7. POSITIONING VS INCUMBENTS -->
+  <section>
+    <h2 class="section-header">7. Positioning vs Incumbents</h2>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr><th>Incumbent</th><th>Coverage / Status</th><th>Where VayuDrishti Differs</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>SAFAR (IITM)</strong></td>
+            <td>~7 metros</td>
+            <td>Forecast display only, no forecast-triggered statutory response; no attribution evidence chain.</td>
+          </tr>
+          <tr>
+            <td><strong>IITM-DSS</strong></td>
+            <td>Delhi only (2021 inventory); <strong>suspended by CAQM</strong> over reliability</td>
+            <td>Transparent per-signal triggers, provenance labels, honest confidence vs opaque model.</td>
+          </tr>
+          <tr>
+            <td><strong>SAMEER (CPCB)</strong></td>
+            <td>National AQI display, <strong>English-only</strong></td>
+            <td>6 languages, voice-first citizen channel, advisories naming nearby vulnerable locations.</td>
+          </tr>
+          <tr>
+            <td><strong>Microsoft Aurora</strong></td>
+            <td>Global AI forecasting at 44 km (Nature 2025)</td>
+            <td>Validates AI for air quality — VayuDrishti operates at <strong>ward/station scale</strong> and automates statutory action.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 8. SCALABILITY -->
+  <section>
+    <h2 class="section-header">8. Scalability Analysis</h2>
+    <ul>
+      <li><strong>Adding a city</strong> is a <code>stations.json</code> entry plus coordinates — no router/service code changes. Demonstrably speaks GoI <code>data.gov.in</code> format covering 500+ stations.</li>
+      <li><strong>Pooled ML Model</strong> is station-agnostic; onboarding does not require retraining per station.</li>
+      <li><strong>MongoDB Indexed</strong> on <code>(station_id, timestamp)</code> and <code>city</code>.</li>
+      <li><strong>Agent cost scales with usage, not station count</strong> — cached-first LLM layer means repeated queries cost zero quota.</li>
+    </ul>
+  </section>
+
+  <!-- 9. DATA SOURCES & LICENSING -->
+  <section>
+    <h2 class="section-header">9. Data Sources & Licensing</h2>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr><th>Source</th><th>Data</th><th>License / Terms</th><th>Usage</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>data.gov.in</strong></td><td>CPCB CAAQMS 500+ stations</td><td><strong>GODL India</strong></td><td>Live adapter (<code>gov_feed.py</code>)</td></tr>
+          <tr><td><strong>AQICN / WAQI</strong></td><td>Real-time station AQI</td><td>Attribution required</td><td>Live fetch with concentration inversion</td></tr>
+          <tr><td><strong>Open-Meteo</strong></td><td>Weather (Temp, Wind, Hum)</td><td>CC-BY</td><td>Keyless live weather API</td></tr>
+          <tr><td><strong>NASA FIRMS</strong></td><td>Active fire detections</td><td>Open Data</td><td>Biomass-burning trajectory fusion</td></tr>
+          <tr><td><strong>TomTom</strong></td><td>Traffic congestion</td><td>Developer Terms</td><td>Vehicular covariate in attribution</td></tr>
+          <tr><td><strong>Google Gemini</strong></td><td>LLM Agentic Reasoning</td><td>Terms of Service</td><td>Cached-first + zero-key fallback</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 10. HONESTY & PROVENANCE -->
+  <section>
+    <h2 class="section-header">10. Honesty & Provenance</h2>
+    <p>Every data panel carries explicit provenance badges (<span class="badge-live">LIVE</span> <span class="badge-replay">HISTORICAL REPLAY</span> <span class="badge-model">MODELLED</span>). Concentration-response functions are capped at validated ranges (AQLI 130 µg/m³, WHO AirQ+ 150 µg/m³). Backtests and failures are reported honestly, not hidden.</p>
+  </section>
+
+  <!-- 11. ROADMAP -->
+  <section>
+    <h2 class="section-header">11. Future Roadmap</h2>
+    <ul>
+      <li>Direct CPCB CAAQMS data partnership & WorldPop 1 km raster integration.</li>
+      <li>SMS / IVR telephony integration via cloud providers for non-smartphone reach.</li>
+      <li>Permit-to-work and industrial stack compliance database integration.</li>
+    </ul>
+  </section>
+
+  <!-- 12. TEAM -->
+  <section>
+    <h2 class="section-header">12. Team</h2>
+    <ul>
+      <li><strong>Team Name:</strong> Codeonauts</li>
+      <li><strong>Members:</strong> Piyush Vishwakarma (Team Leader), Tejavath Praveen Sai (Team Member)</li>
+      <li><strong>Competition:</strong> Economic Times AI Hackathon 2.0 — Phase 2 Submission</li>
+      <li><strong>Repository:</strong> <a href="https://github.com/Piyush-vis/VayuDrishti" target="_blank">https://github.com/Piyush-vis/VayuDrishti</a></li>
+    </ul>
+  </section>
+
+  <!-- 13. REFERENCES -->
+  <section>
+    <h2 class="section-header">13. Key References</h2>
+    <ul style="font-size: 12.5px; color: #475569;">
+      <li>CAQM — revised GRAP schedule and stage invocation orders (caqm.nic.in)</li>
+      <li>ThePrint / CEEW — analysis of reactive GRAP invocations, winter 2025-26</li>
+      <li>The Lancet — air pollution mortality estimates for India (1.67M deaths/yr)</li>
+      <li>Dalberg / CII — economic cost of air pollution (~$95B/yr, ~3% of GDP)</li>
+      <li>CREA — NCAP fund utilisation analysis (₹11,211 cr released, ~68% used)</li>
+      <li>EPIC / University of Chicago — Air Quality Life Index (AQLI) methodology</li>
+      <li>WHO — AirQ+ tool and short-term PM2.5 concentration-response functions</li>
+      <li>openair project — CPF (Conditional Probability Function) methodology</li>
+      <li>Microsoft Aurora — Nature (2025), s41586-025-09005-y</li>
+      <li>data.gov.in — real-time CAAQMS resource, Government Open Data License – India</li>
+    </ul>
+  </section>
+
+</div>
+
+</body>
+</html>
