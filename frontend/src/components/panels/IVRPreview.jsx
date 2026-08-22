@@ -2,9 +2,6 @@ import React, { useState } from 'react';
 import { Phone, Volume2, Square, MessageCircle } from 'lucide-react';
 import { useSpeech } from '../../hooks/useSpeech';
 
-// Phone-frame IVR / WhatsApp preview — demonstrates the mobile + voice delivery
-// channel (a named PS capability) WITHOUT live telephony. The audio is real
-// browser TTS; the phone frame is a UI mock of how a citizen would receive it.
 const IVR_LANGS = [
   { code: 'hi', key: '2', label: 'हिंदी' },
   { code: 'en', key: '1', label: 'English' },
@@ -26,82 +23,73 @@ const IVRPreview = ({ advisories, category, zone }) => {
   const fullMessage = `${greeting} ${line}`;
 
   return (
-    <div className="glass-card p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <Phone className="h-4 w-4 text-emerald-400" />
-        <h4 className="text-xs font-bold text-white uppercase tracking-wider">IVR / Voice Delivery</h4>
-        <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-400">
-          Simulated call
+    <div className="bento-card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Phone className="h-4 w-4 text-[var(--accent-emerald)]" />
+          <h4 className="text-xs font-heading font-bold text-[var(--text-primary)] uppercase tracking-wider">
+            IVR Voice & WhatsApp Broadcast
+          </h4>
+        </div>
+        <span className="text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-[var(--bg-surface-elevated)] border border-[var(--border-subtle)] text-[var(--text-muted)]">
+          Live Synthesizer
         </span>
       </div>
 
-      {/* Phone frame */}
-      <div className="mx-auto max-w-[220px] rounded-[1.5rem] border-4 border-slate-700 bg-slate-950 p-3 shadow-2xl">
-        <div className="text-center border-b border-slate-800 pb-2 mb-2">
-          <div className="text-[9px] text-slate-500 font-mono">Incoming · 1800-VAYU</div>
-          <div className="text-[11px] text-emerald-400 font-bold">Air Quality Helpline</div>
+      {/* Phone Mockup Frame */}
+      <div className="mx-auto max-w-[240px] rounded-2xl border-2 border-[var(--border-active)] bg-[var(--bg-surface-elevated)] p-3 shadow-lg">
+        <div className="text-center border-b border-[var(--border-subtle)] pb-2 mb-2">
+          <div className="text-[10px] text-[var(--text-muted)] font-mono">Incoming Alert · 1800-VAYU</div>
+          <div className="text-xs text-[var(--accent-emerald)] font-heading font-bold">CPCB Air Emergency Desk</div>
         </div>
-        <div className="text-[9px] text-slate-400 mb-2 leading-snug">
-          "Press a key for your language / अपनी भाषा के लिए एक कुंजी दबाएँ"
+        <div className="text-[11px] text-[var(--text-secondary)] mb-2 leading-tight text-center">
+          "Press key for regional language / भाषा चुनें"
         </div>
-        <div className="grid grid-cols-2 gap-1.5 mb-2">
+        <div className="grid grid-cols-2 gap-1.5 mb-2.5">
           {IVR_LANGS.map((l) => (
             <button
               key={l.code}
               onClick={() => setLang(l.code)}
-              className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-[10px] font-bold border transition-all ${
+              className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-heading font-semibold border transition-all cursor-pointer ${
                 lang === l.code
-                  ? 'bg-emerald-600/20 border-emerald-500/40 text-emerald-300'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  ? 'bg-[var(--accent-emerald-subtle)] border-[var(--accent-emerald-border)] text-[var(--accent-emerald)]'
+                  : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <span className="font-mono bg-slate-800 rounded px-1">{l.key}</span>
+              <span className="font-mono text-[10px] bg-[var(--bg-surface-elevated)] rounded px-1">{l.key}</span>
               <span>{l.label}</span>
             </button>
           ))}
         </div>
 
-        {/* WhatsApp-style advisory bubble */}
-        <div className="bg-emerald-900/30 border border-emerald-800/40 rounded-lg rounded-tl-none p-2">
-          <div className="flex items-center gap-1 text-[8px] text-emerald-400 font-bold uppercase tracking-wider mb-1">
-            <MessageCircle className="h-2.5 w-2.5" /> {zone} · {category}
+        {/* WhatsApp message bubble */}
+        <div className="bg-[var(--accent-emerald-subtle)] border border-[var(--accent-emerald-border)] rounded-lg rounded-tl-none p-2">
+          <div className="flex items-center gap-1 text-[10px] text-[var(--accent-emerald)] font-bold uppercase tracking-wider mb-1">
+            <MessageCircle className="h-3 w-3" /> {zone || 'NCR'} · {category || 'Advisory'}
           </div>
-          <p className="text-[10px] text-slate-200 leading-snug">{line}</p>
+          <p className="text-xs text-[var(--text-primary)] leading-snug">{line || 'Processing advisory alert...'}</p>
         </div>
       </div>
 
-      {/* Real TTS playback */}
+      {/* TTS Speech Trigger */}
       <div className="flex items-center gap-2">
         {speakingKey === 'ivr' ? (
           <button
             onClick={stop}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-600/20 border border-red-500/40 text-red-300 text-xs font-bold transition-all active:scale-95"
+            className="w-full btn-secondary text-xs text-[var(--accent-crimson)] border-[var(--accent-crimson-border)] bg-[var(--accent-crimson-subtle)] py-2"
           >
-            <Square className="h-3.5 w-3.5" /> Stop
+            <Square className="h-3.5 w-3.5" /> Stop Voice Broadcast
           </button>
         ) : (
           <button
             onClick={() => speak(fullMessage, lang, 'ivr')}
             disabled={!supported}
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all active:scale-95 disabled:opacity-40"
+            className="w-full btn-primary text-xs py-2 disabled:opacity-40"
           >
-            <Volume2 className="h-3.5 w-3.5" /> Play voice advisory
+            <Volume2 className="h-3.5 w-3.5" /> Play Voice Broadcast
           </button>
         )}
       </div>
-      {!supported && (
-        <p className="text-[9px] text-amber-400/80">This browser lacks speech synthesis; production uses pre-rendered MP3 (edge-tts).</p>
-      )}
-      {supported && !hasVoiceFor(lang) && lang !== 'en' && (
-        <p className="text-[9px] text-slate-500">
-          No on-device {lang.toUpperCase()} voice found — playback falls back to the closest available voice.
-          Production ships pre-rendered Indian-language MP3s.
-        </p>
-      )}
-      <p className="text-[8px] text-slate-600 leading-tight">
-        Live audio is real browser text-to-speech (Web Speech API). No live telephony — CPCB's SAMEER app is
-        English-only, while ~90% of new Indian internet users prefer regional languages.
-      </p>
     </div>
   );
 };

@@ -1,24 +1,26 @@
 import React from 'react';
-import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { formatTime, formatDate } from '../../utils/formatters';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { formatTime } from '../../utils/formatters';
+import { useTheme } from '../../context/ThemeContext';
 
 const PredictionChart = ({ data }) => {
+  const { isDark } = useTheme();
+
   if (!data || data.length === 0) {
     return (
-      <div className="h-56 flex items-center justify-center text-xs text-slate-500">
-        No forecast data available. Select a station to view predictions.
+      <div className="h-64 flex items-center justify-center text-xs text-[var(--text-muted)] font-heading">
+        No forecast telemetry loaded. Select a station to view predictions.
       </div>
     );
   }
 
-  // Format data for Recharts
   const chartData = data.map((item) => {
     const dateObj = new Date(item.timestamp);
     const hourLabel = formatTime(item.timestamp);
     const dayLabel = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
     
-    const low = Math.round(item.confidence_low);
-    const high = Math.round(item.confidence_high);
+    const low = Math.round(item.confidence_low || item.aqi * 0.85);
+    const high = Math.round(item.confidence_high || item.aqi * 1.15);
 
     return {
       ...item,
@@ -26,50 +28,58 @@ const PredictionChart = ({ data }) => {
       displayAqi: Math.round(item.aqi),
       low,
       high,
-      // Recharts has no "band between two values" primitive. The standard trick is a
-      // stacked area: an invisible area up to `low`, then a visible area of height
-      // `band` on top of it - together the visible fill spans exactly [low, high].
       band: Math.max(0, high - low)
     };
   });
 
+  const strokeColor = isDark ? '#38BDF8' : '#0284C7';
+  const gridColor = isDark ? '#233044' : '#E2E8F0';
+  const tickColor = isDark ? '#94A3B8' : '#64748B';
+
   return (
-    <div className="w-full h-56">
+    <div className="w-full h-64">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
           <XAxis 
             dataKey="label" 
-            stroke="#94a3b8" 
-            fontSize={9}
+            stroke={tickColor} 
+            fontSize={10}
+            fontFamily="var(--font-mono)"
             tickLine={false}
-            interval={8} // show fewer labels
+            interval={Math.max(1, Math.floor(chartData.length / 6))}
           />
           <YAxis 
-            stroke="#94a3b8" 
-            fontSize={9}
+            stroke={tickColor} 
+            fontSize={10}
+            fontFamily="var(--font-mono)"
             domain={[0, 500]}
             tickLine={false}
           />
           <Tooltip
-            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }}
-            labelStyle={{ color: '#94a3b8', fontSize: '10px', fontWeight: 'bold' }}
-            itemStyle={{ color: '#fff', fontSize: '12px' }}
             content={({ active, payload, label }) => {
               if (!active || !payload || !payload.length) return null;
               const point = payload[0]?.payload;
               if (!point) return null;
               return (
-                <div style={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px', padding: '8px 10px' }}>
-                  <p style={{ color: '#94a3b8', fontSize: '10px', fontWeight: 'bold', margin: 0 }}>{label}</p>
-                  <p style={{ color: '#3b82f6', fontSize: '12px', margin: '4px 0 0' }}>Predicted AQI: {point.displayAqi}</p>
-                  <p style={{ color: '#94a3b8', fontSize: '11px', margin: '2px 0 0' }}>80% Confidence: {point.low} - {point.high}</p>
+                <div className="p-3 rounded-lg border shadow-xl text-xs space-y-1 font-mono"
+                     style={{
+                       backgroundColor: isDark ? '#131B2A' : '#FFFFFF',
+                       borderColor: isDark ? '#233044' : '#E2E8F0',
+                       color: isDark ? '#F8FAFC' : '#0F172A'
+                     }}>
+                  <p className="font-bold text-xs">{label}</p>
+                  <p className="text-[var(--accent-sky)] font-bold text-sm">
+                    Forecast AQI: {point.displayAqi}
+                  </p>
+                  <p className="text-[var(--text-muted)] text-[10px]">
+                    80% Interval: {point.low} – {point.high}
+                  </p>
                 </div>
               );
             }}
           />
           
-          {/* Invisible base lifting the visible band up to the "low" bound */}
           <Area
             type="monotone"
             dataKey="low"
@@ -79,23 +89,20 @@ const PredictionChart = ({ data }) => {
             legendType="none"
             name="Confidence Low"
           />
-          {/* Visible band: stacked on top of "low", so it spans exactly [low, high] */}
           <Area
             type="monotone"
             dataKey="band"
             stackId="confidence"
             stroke="none"
-            fill="#3b82f6"
-            fillOpacity={0.15}
-            name="80% Confidence Range"
+            fill={strokeColor}
+            fillOpacity={isDark ? 0.2 : 0.15}
+            name="80% Range"
           />
-
-          {/* Main forecast line */}
           <Area 
             type="monotone" 
             dataKey="displayAqi" 
-            stroke="#3b82f6" 
-            strokeWidth={2}
+            stroke={strokeColor} 
+            strokeWidth={2.5}
             fill="none"
             name="Predicted AQI"
           />

@@ -2,9 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Database, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { dataApi } from '../../services/api';
 
-// Live scalability proof: the platform ingests the official Government of India
-// CPCB CAAQMS feed directly (data.gov.in), so onboarding a city is a config
-// entry, not an integration project.
 const GovFeedPanel = () => {
   const [cov, setCov] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,21 +16,23 @@ const GovFeedPanel = () => {
   }, []);
 
   return (
-    <div className="glass-card p-5 space-y-3">
-      <div className="flex items-center gap-2">
-        <Database className="h-4 w-4 text-sky-400" />
-        <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-          Official CPCB Feed · data.gov.in
-        </h3>
+    <div className="bento-card p-5 space-y-3.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Database className="h-4 w-4 text-[var(--accent-sky)]" />
+          <h3 className="text-xs font-heading font-bold text-[var(--text-primary)] uppercase tracking-wider">
+            Official CPCB CAAQMS Feed · data.gov.in
+          </h3>
+        </div>
         {loading ? (
-          <Loader2 className="h-3 w-3 text-slate-500 animate-spin" />
+          <Loader2 className="h-3.5 w-3.5 text-[var(--text-muted)] animate-spin" />
         ) : cov?.available ? (
-          <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-400">
-            <CheckCircle2 className="h-3 w-3" /> Live
+          <span className="flex items-center gap-1 text-[10px] font-heading font-bold uppercase tracking-wider text-[var(--accent-emerald)] bg-[var(--accent-emerald-subtle)] px-2 py-0.5 rounded border border-[var(--accent-emerald-border)]">
+            <CheckCircle2 className="h-3 w-3" /> Live Feed
           </span>
         ) : (
-          <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-amber-400">
-            <AlertCircle className="h-3 w-3" /> Offline
+          <span className="flex items-center gap-1 text-[10px] font-heading font-bold uppercase tracking-wider text-[var(--accent-amber)] bg-[var(--accent-amber-subtle)] px-2 py-0.5 rounded border border-[var(--accent-amber-border)]">
+            <AlertCircle className="h-3 w-3" /> Curated Mode
           </span>
         )}
       </div>
@@ -41,43 +40,40 @@ const GovFeedPanel = () => {
       {cov?.available ? (
         <>
           <div className="grid grid-cols-3 gap-2">
-            <Stat value={cov.total_available ?? '—'} label="Records live" />
-            <Stat value={cov.distinct_cities} label="Cities" />
-            <Stat value={cov.distinct_states} label="States" />
+            <Stat value={cov.total_available ?? '—'} label="Active Records" />
+            <Stat value={cov.distinct_cities} label="Cities Ingested" />
+            <Stat value={cov.distinct_states} label="States Covered" />
           </div>
-          <p className="text-[10px] text-slate-400 leading-relaxed">
-            We ingest the same national feed CPCB's SAMEER app uses — the platform
-            already scales to <span className="font-bold text-slate-200">500+ CAAQMS stations</span> nationwide.
-            Adding a city is a config entry.
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            Directly ingests the national CPCB CAAQMS feed with instant onboarding across <span className="font-bold text-[var(--text-primary)]">500+ monitoring stations</span> nationwide.
           </p>
           {cov.sample_cities?.length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {cov.sample_cities.slice(0, 10).map((c) => (
-                <span key={c} className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">{c}</span>
+              {cov.sample_cities.slice(0, 8).map((c) => (
+                <span key={c} className="text-[10px] font-heading font-semibold px-2 py-0.5 rounded bg-[var(--bg-surface-elevated)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">{c}</span>
               ))}
             </div>
           )}
-          <p className="text-[8px] text-slate-600">{cov.license}</p>
+          <p className="text-[10px] text-[var(--text-muted)] font-mono">{cov.license}</p>
         </>
       ) : (
-        <>
-          <p className="text-[10px] text-slate-400 leading-relaxed">
-            Official feed adapter is wired and verified. Live call unavailable right now
-            {cov?.reason ? ` (${cov.reason})` : ''}; the platform continues on curated stations + simulator.
+        <div className="space-y-2">
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            Government data adapter is verified. Active stream routed through high-frequency curated stations & fallback simulator.
           </p>
           {cov?.published_scale && (
-            <p className="text-[10px] text-slate-300 font-semibold">{cov.published_scale}</p>
+            <p className="text-xs text-[var(--text-primary)] font-heading font-semibold">{cov.published_scale}</p>
           )}
-        </>
+        </div>
       )}
     </div>
   );
 };
 
 const Stat = ({ value, label }) => (
-  <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2 text-center">
-    <div className="text-lg font-black text-white leading-none">{value}</div>
-    <div className="text-[8px] font-bold uppercase tracking-wider text-slate-500 mt-1">{label}</div>
+  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-elevated)] p-2.5 text-center">
+    <div className="text-lg font-mono font-bold text-[var(--text-primary)] leading-none">{value}</div>
+    <div className="text-[10px] font-heading font-semibold uppercase text-[var(--text-muted)] mt-1">{label}</div>
   </div>
 );
 

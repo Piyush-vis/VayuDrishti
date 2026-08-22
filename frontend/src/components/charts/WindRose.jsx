@@ -1,8 +1,6 @@
 import React from 'react';
+import { useTheme } from '../../context/ThemeContext';
 
-// Polar CPF "pollution rose": wedge length = Conditional Probability Function
-// value per 16-point wind sector, i.e. P(high pollution | wind from sector).
-// The dominant sector points at where the pollution is coming FROM.
 const CX = 80;
 const CY = 80;
 const R_MAX = 62;
@@ -24,15 +22,27 @@ function wedgePath(centreDeg, r) {
 }
 
 const WindRose = ({ windRose }) => {
+  const { isDark } = useTheme();
   if (!windRose || !windRose.valid) return null;
   const dominant = windRose.dominant;
 
+  const circleStroke = isDark ? '#233044' : '#E2E8F0';
+  const labelColor = isDark ? '#94A3B8' : '#64748B';
+
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-4">
       <svg viewBox="0 0 160 160" className="w-32 h-32 shrink-0">
         {[0.25, 0.5, 0.75, 1.0].map((f) => (
-          <circle key={f} cx={CX} cy={CY} r={R_MIN + f * (R_MAX - R_MIN)}
-            fill="none" stroke="#334155" strokeWidth="0.6" strokeDasharray="2 3" />
+          <circle 
+            key={f} 
+            cx={CX} 
+            cy={CY} 
+            r={R_MIN + f * (R_MAX - R_MIN)}
+            fill="none" 
+            stroke={circleStroke} 
+            strokeWidth="0.8" 
+            strokeDasharray="2 3" 
+          />
         ))}
         {windRose.sectors.map((s) => {
           const cpf = s.cpf;
@@ -44,34 +54,47 @@ const WindRose = ({ windRose }) => {
             <path
               key={s.sector}
               d={wedgePath(s.centre_deg, Math.max(r, R_MIN + 1))}
-              fill={isDominant ? '#a855f7' : cpf ? '#3b82f6' : '#475569'}
-              fillOpacity={isDominant ? 0.9 : cpf ? 0.55 : 0.35}
-              stroke={isDominant ? '#c084fc' : 'none'}
-              strokeWidth={isDominant ? 1 : 0}
+              fill={isDominant ? (isDark ? '#A78BFA' : '#7C3AED') : cpf ? (isDark ? '#38BDF8' : '#0284C7') : (isDark ? '#334155' : '#CBD5E1')}
+              fillOpacity={isDominant ? 0.95 : cpf ? 0.6 : 0.4}
+              stroke={isDominant ? (isDark ? '#C084FC' : '#6D28D9') : 'none'}
+              strokeWidth={isDominant ? 1.5 : 0}
             >
-              <title>{`${s.sector}: CPF ${cpf === null || cpf === undefined ? 'n/a (low sample)' : cpf} · ${s.hours}h · mean ${s.mean_conc ?? '–'} µg/m³`}</title>
+              <title>{`${s.sector}: CPF ${cpf === null || cpf === undefined ? 'n/a' : cpf} · ${s.hours}h · mean ${s.mean_conc ?? '–'} µg/m³`}</title>
             </path>
           );
         })}
         {['N', 'E', 'S', 'W'].map((lbl, i) => {
           const [x, y] = polar(i * 90, R_MAX + 9);
           return (
-            <text key={lbl} x={x} y={y + 3} textAnchor="middle"
-              className="fill-slate-400" fontSize="9" fontWeight="700">{lbl}</text>
+            <text 
+              key={lbl} 
+              x={x} 
+              y={y + 3} 
+              textAnchor="middle"
+              fill={labelColor} 
+              fontSize="9" 
+              fontFamily="var(--font-mono)"
+              fontWeight="700"
+            >
+              {lbl}
+            </text>
           );
         })}
       </svg>
-      <div className="text-[10px] text-slate-400 leading-relaxed min-w-0">
-        <div className="font-bold text-slate-200 uppercase tracking-wider text-[9px] mb-1">CPF Pollution Rose</div>
+
+      <div className="text-xs space-y-1 min-w-0">
+        <p className="font-heading font-bold text-[var(--text-primary)] text-xs uppercase tracking-wider">
+          CPF Pollution Rose
+        </p>
         {dominant && (
-          <div>
-            High-pollution wind sector: <span className="font-bold text-purple-300">{dominant.sector}</span>{' '}
-            (CPF <span className="font-bold text-purple-300">{Math.round(dominant.cpf * 100)}%</span>)
-          </div>
+          <p className="text-xs text-[var(--text-secondary)]">
+            Primary Inflow: <span className="font-bold text-[var(--accent-purple)]">{dominant.sector}</span>{' '}
+            (CPF <span className="font-mono font-bold text-[var(--text-primary)]">{Math.round(dominant.cpf * 100)}%</span>)
+          </p>
         )}
-        <div className="mt-1 text-slate-500">
-          P(PM2.5 ≥ {windRose.threshold_ug_m3} µg/m³ | wind from sector), {windRose.n_observations}h window
-        </div>
+        <p className="text-[11px] text-[var(--text-muted)] leading-tight">
+          P(PM2.5 ≥ {windRose.threshold_ug_m3} µg/m³ | sector wind)
+        </p>
       </div>
     </div>
   );

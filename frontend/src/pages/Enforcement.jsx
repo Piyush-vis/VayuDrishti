@@ -6,13 +6,13 @@ import GRAPPanel from '../components/panels/GRAPPanel';
 function Enforcement({ activeCity, fetchBaseData }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35 }}
-      className="space-y-6 w-full"
+      transition={{ duration: 0.25 }}
+      className="space-y-5 w-full max-w-7xl mx-auto"
     >
       <GRAPPanel city={activeCity} />
-      <div className="glass-card p-6 bg-slate-900/20 w-full">
+      <div className="bento-card p-5 w-full">
         <EnforcementPanel city={activeCity} onRefresh={fetchBaseData} />
       </div>
     </motion.div>
