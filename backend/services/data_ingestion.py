@@ -337,9 +337,9 @@ async def fetch_openweathermap_aqi(lat: float, lon: float) -> Dict[str, Any]:
     if not getattr(settings, "OPENWEATHERMAP_API_KEY", None):
         return {}
         
-    url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={settings.OPENWEATHERMAP_API_KEY}"
+    url = f"https://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={settings.OPENWEATHERMAP_API_KEY}"
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             resp = await client.get(url)
             if resp.status_code == 200:
                 body = resp.json()
@@ -355,7 +355,7 @@ async def fetch_openweathermap_aqi(lat: float, lon: float) -> Dict[str, Any]:
                         "co": components.get("co", 0.0) / 1000.0,
                     }
     except Exception as e:
-        print(f"Error fetching OpenWeatherMap AQI: {e}")
+        print(f"Error fetching OpenWeatherMap AQI ({type(e).__name__}): {e}")
     return {}
 
 async def ingest_live_data_for_station(station: Dict[str, Any]) -> Dict[str, Any]:
@@ -402,28 +402,29 @@ async def ingest_live_data_for_station(station: Dict[str, Any]) -> Dict[str, Any
         if aqi_data:
             data_source = "live:owm"
         
-    # 3. Build reading
+    # 3. Calculate Indian AQI & build final payload
     if aqi_data:
-        pm25 = aqi_data.get("pm25") or random.uniform(20.0, 50.0)
-        pm10 = aqi_data.get("pm10") or random.uniform(40.0, 80.0)
-        no2  = aqi_data.get("no2")  or random.uniform(10.0, 30.0)
-        so2  = aqi_data.get("so2")  or random.uniform(2.0, 10.0)
-        o3   = aqi_data.get("o3")   or random.uniform(15.0, 35.0)
-        co   = aqi_data.get("co")   or random.uniform(0.2, 0.8)
-        
-        aqi = calculate_indian_aqi(pm25, pm10, no2, so2, o3, co)
-        
-        temp  = weather_data.get("temperature")  or random.uniform(20.0, 35.0)
-        hum   = weather_data.get("humidity")      or random.uniform(40.0, 80.0)
-        w_spd = weather_data.get("wind_speed")    or random.uniform(2.0, 12.0)
-        w_dir = weather_data.get("wind_direction") or random.randint(0, 359)
-        precip = weather_data.get("precipitation") or 0.0
+        pm25 = aqi_data.get("pm25", 0.0)
+        pm10 = aqi_data.get("pm10", 0.0)
+        no2  = aqi_data.get("no2", 0.0)
+        so2  = aqi_data.get("so2", 0.0)
+        o3   = aqi_data.get("o3", 0.0)
+        co   = aqi_data.get("co", 0.0)
+
+        # Weather values
+        temp   = weather_data.get("temperature", 25.0) if weather_data else 25.0
+        hum    = weather_data.get("humidity", 50.0) if weather_data else 50.0
+        w_spd  = weather_data.get("wind_speed", 5.0) if weather_data else 5.0
+        w_dir  = weather_data.get("wind_direction", 180) if weather_data else 180
+        precip = weather_data.get("precipitation", 0.0) if weather_data else 0.0
+
+        calculated_aqi = calculate_indian_aqi(pm25, pm10, no2, so2, o3, co)
 
         reading = {
             "station_id": station_id,
             "city": city,
             "timestamp": timestamp,
-            "aqi": aqi,
+            "aqi": calculated_aqi,
             "pm25": round(pm25, 1),
             "pm10": round(pm10, 1),
             "no2": round(no2, 1),
@@ -467,7 +468,7 @@ async def ingest_live_data_for_station(station: Dict[str, Any]) -> Dict[str, Any
 
 async def ingest_all_cities():
     """
-    Ingest live data for all stations in database.
+    Ingest live data for all stations in database in controlled batches of 10.
     """
     if db_helper.stations is None:
         db_helper.connect()
@@ -475,8 +476,14 @@ async def ingest_all_cities():
     cursor = db_helper.stations.find({"active": True})
     stations = await cursor.to_list(length=100)
     
-    tasks = [ingest_live_data_for_station(station) for station in stations]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    results = []
+    batch_size = 10
+    for i in range(0, len(stations), batch_size):
+        batch = stations[i:i + batch_size]
+        batch_tasks = [ingest_live_data_for_station(station) for station in batch]
+        batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+        results.extend(batch_results)
+        await asyncio.sleep(0.2)
     
     success_count = sum(1 for r in results if isinstance(r, dict))
     print(f"Live data ingestion finished. Successful: {success_count}/{len(stations)}")
