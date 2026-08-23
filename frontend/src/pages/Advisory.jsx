@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion';
 import React, { useState } from 'react';
+import { Box, Card, Typography } from '@mui/material';
 import AdvisoryPanel from '../components/panels/AdvisoryPanel';
 import IVRPreview from '../components/panels/IVRPreview';
 import { getAqiCategory } from '../utils/constants';
@@ -10,15 +10,18 @@ function Advisory({ activeCity, selectedStation, currentReadings }) {
   const [advisories, setAdvisories] = useState(null);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
-      className="max-w-7xl mx-auto w-full space-y-5"
-    >
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, width: '100%', minWidth: 0 }}>
       {selectedStation ? (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          <div className="lg:col-span-8 bento-card p-6">
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', lg: '1.6fr 1fr' },
+            gap: 2.5,
+            width: '100%',
+            alignItems: 'start',
+          }}
+        >
+          <Box sx={{ minWidth: 0 }}>
             <AdvisoryPanel
               city={activeCity}
               zone={selectedStation.zone}
@@ -26,21 +29,23 @@ function Advisory({ activeCity, selectedStation, currentReadings }) {
               category={activeStationAqiCat?.label}
               onAdvisories={setAdvisories}
             />
-          </div>
-          <div className="lg:col-span-4">
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
             <IVRPreview
               advisories={advisories}
               category={activeStationAqiCat?.label}
               zone={selectedStation.zone}
             />
-          </div>
-        </div>
+          </Box>
+        </Box>
       ) : (
-        <div className="bento-card p-12 text-center text-[var(--text-muted)] text-xs font-heading">
-          Please select a monitoring station in the Command Center to inspect citizen health advisories.
-        </div>
+        <Card elevation={1} sx={{ p: 6, textAlign: 'center', borderRadius: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            Please select a monitoring station in the Command Center to inspect citizen health advisories.
+          </Typography>
+        </Card>
       )}
-    </motion.div>
+    </Box>
   );
 }
 

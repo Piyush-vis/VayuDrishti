@@ -1,16 +1,20 @@
 import React from 'react';
+import { Box, Typography } from '@mui/material';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatTime } from '../../utils/formatters';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '@mui/material/styles';
 
 const AQITrendChart = ({ data }) => {
-  const { isDark } = useTheme();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
 
   if (!data || data.length === 0) {
     return (
-      <div className="h-52 flex items-center justify-center text-xs text-[var(--text-muted)] font-heading">
-        No 24-hour trend telemetry recorded.
-      </div>
+      <Box sx={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="caption" color="text.secondary">
+          No 24-hour trend telemetry recorded.
+        </Typography>
+      </Box>
     );
   }
 
@@ -19,14 +23,14 @@ const AQITrendChart = ({ data }) => {
     timeLabel: formatTime(item.timestamp),
   }));
 
-  const strokeColor = isDark ? '#10B981' : '#059669';
-  const gridColor = isDark ? '#233044' : '#E2E8F0';
-  const tickColor = isDark ? '#94A3B8' : '#64748B';
+  const strokeColor = isDark ? '#00B4D8' : '#00838F';
+  const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0';
+  const tickColor = isDark ? '#CBD5E1' : '#334155';
 
   return (
-    <div className="w-full h-52">
+    <Box sx={{ width: '100%', height: 180 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 4 }}>
           <defs>
             <linearGradient id="aqiTrendGrad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={strokeColor} stopOpacity={isDark ? 0.35 : 0.25} />
@@ -37,29 +41,30 @@ const AQITrendChart = ({ data }) => {
           <XAxis 
             dataKey="timeLabel" 
             stroke={tickColor} 
-            fontSize={10}
-            fontFamily="var(--font-mono)"
+            fontSize={10.5}
+            fontWeight={600}
+            fontFamily="monospace"
             tickLine={false}
             dy={4}
           />
           <YAxis 
             stroke={tickColor} 
             fontSize={10}
-            fontFamily="var(--font-mono)"
+            fontFamily="monospace"
             domain={[0, 'auto']}
             tickLine={false}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: isDark ? '#131B2A' : '#FFFFFF',
-              borderColor: isDark ? '#233044' : '#E2E8F0',
-              borderRadius: '8px',
-              boxShadow: '0 8px 24px -4px rgba(0,0,0,0.2)',
-              fontFamily: 'var(--font-mono)',
+              backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0',
+              borderRadius: '4px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              fontFamily: 'monospace',
               fontSize: '11px',
-              color: isDark ? '#F8FAFC' : '#0F172A'
+              color: isDark ? '#FFFFFF' : '#0F172A',
             }}
-            labelStyle={{ fontWeight: 'bold', color: isDark ? '#F8FAFC' : '#0F172A', marginBottom: '4px' }}
+            labelStyle={{ fontWeight: 'bold', color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: '4px' }}
           />
           <Area 
             type="monotone" 
@@ -72,7 +77,7 @@ const AQITrendChart = ({ data }) => {
           />
         </AreaChart>
       </ResponsiveContainer>
-    </div>
+    </Box>
   );
 };
 

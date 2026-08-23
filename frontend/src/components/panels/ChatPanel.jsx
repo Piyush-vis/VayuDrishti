@@ -1,26 +1,40 @@
 import React, { useState, useRef, useEffect } from 'react';
+import {
+  Box,
+  Typography,
+  IconButton,
+  TextField,
+  Chip,
+  Paper,
+  Avatar,
+  CircularProgress,
+  Divider
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import SendIcon from '@mui/icons-material/Send';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import PersonIcon from '@mui/icons-material/Person';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { chatApi } from '../../services/api';
-import { Send, Bot, User, BookOpen, Sparkles, X } from 'lucide-react';
-import { useTheme } from '../../context/ThemeContext';
 
 const SUGGESTED_QUERIES = [
-  "What is the 24-hr NAAQS standard for PM2.5?",
-  "What are the GRAP Stage III emergency rules?",
-  "What is the NCAP clean air target for Indian cities?"
+  'What is the 24-hr NAAQS standard for PM2.5?',
+  'What are the GRAP Stage III emergency rules?',
+  'What is the NCAP clean air target for Indian cities?',
 ];
 
 const ChatPanel = ({ onClose }) => {
-  const { isDark } = useTheme();
   const [messages, setMessages] = useState([
     {
       sender: 'bot',
       text: "Hello! I am VayuDrishti's AI Regulatory Assistant. Ask me about CPCB regulations, NAAQS standards, GRAP emergency stages, or NCAP targets.",
-      sources: []
-    }
+      sources: [],
+    },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -47,17 +61,17 @@ const ChatPanel = ({ onClose }) => {
           text: resp.answer,
           sources: resp.sources || [],
           provenance: resp.provenance,
-        }
+        },
       ]);
     } catch (err) {
       console.error(err);
       setMessages((prev) => [
-        ...prev, 
-        { 
-          sender: 'bot', 
-          text: "I encountered an error connecting to the regulatory intelligence index. Please try again in a moment.", 
-          sources: [] 
-        }
+        ...prev,
+        {
+          sender: 'bot',
+          text: 'I encountered an error connecting to the regulatory intelligence index. Please try again in a moment.',
+          sources: [],
+        },
       ]);
     } finally {
       setLoading(false);
@@ -70,122 +84,147 @@ const ChatPanel = ({ onClose }) => {
   };
 
   return (
-    <div className="flex flex-col h-[520px] bento-card overflow-hidden shadow-2xl">
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: 520, bgcolor: 'background.paper' }}>
       {/* Header */}
-      <div className="bg-[var(--bg-surface-elevated)] px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="p-1.5 bg-[var(--accent-emerald-subtle)] text-[var(--accent-emerald)] rounded-lg border border-[var(--accent-emerald-border)]">
-            <BookOpen className="h-4 w-4" />
-          </div>
-          <div>
-            <h3 className="text-xs font-heading font-bold text-[var(--text-primary)] uppercase tracking-wider">
+      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: 1, borderColor: 'divider', bgcolor: 'background.default' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32, borderRadius: 1 }}>
+            <MenuBookIcon sx={{ fontSize: 18 }} />
+          </Avatar>
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
               CPCB Regulatory Assistant
-            </h3>
-            <p className="text-[10px] text-[var(--text-muted)] font-mono">
-              Grounded in NAAQS, NCAP & GRAP Frameworks
-            </p>
-          </div>
-        </div>
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
+              NAAQS, NCAP & GRAP Frameworks
+            </Typography>
+          </Box>
+        </Box>
         {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1 rounded-md hover:bg-[var(--bg-surface)] transition-all cursor-pointer"
-            title="Close Assistant"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <IconButton size="small" onClick={onClose}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
         )}
-      </div>
+      </Box>
 
       {/* Suggested Quick Questions */}
-      <div className="px-3 py-2 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] flex items-center gap-1.5 overflow-x-auto shrink-0">
-        <Sparkles className="h-3 w-3 text-[var(--accent-emerald)] shrink-0" />
-        <span className="text-[10px] font-heading font-semibold text-[var(--text-muted)] uppercase shrink-0">Suggested:</span>
+      <Box sx={{ px: 1.5, py: 1, display: 'flex', alignItems: 'center', gap: 1, overflowX: 'auto', borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+        <AutoAwesomeIcon sx={{ fontSize: 14, color: 'primary.main', shrink: 0 }} />
+        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+          SUGGESTED:
+        </Typography>
         {SUGGESTED_QUERIES.map((q, idx) => (
-          <button
+          <Chip
             key={idx}
+            label={q}
+            size="small"
+            variant="outlined"
             onClick={() => sendQuery(q)}
-            className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[var(--bg-surface-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--border-active)] whitespace-nowrap transition-all cursor-pointer"
-          >
-            {q}
-          </button>
+            clickable
+            sx={{ borderRadius: 1, fontSize: '0.6875rem', height: 24, whiteSpace: 'nowrap' }}
+          />
         ))}
-      </div>
+      </Box>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-[var(--bg-base)]">
+      <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2, bgcolor: 'background.default' }}>
         {messages.map((msg, idx) => (
-          <div key={idx} className={`flex gap-2.5 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <Box
+            key={idx}
+            sx={{
+              display: 'flex',
+              gap: 1.5,
+              justifyContent: msg.sender === 'user' ? 'flex-end' : 'flex-start',
+            }}
+          >
             {msg.sender === 'bot' && (
-              <div className="h-7 w-7 rounded-lg bg-[var(--accent-emerald-subtle)] text-[var(--accent-emerald)] border border-[var(--accent-emerald-border)] flex items-center justify-center shrink-0">
-                <Bot className="h-4 w-4" />
-              </div>
+              <Avatar sx={{ bgcolor: 'primary.main', width: 28, height: 28, borderRadius: 1 }}>
+                <SmartToyIcon sx={{ fontSize: 16 }} />
+              </Avatar>
             )}
-            
-            <div className="space-y-1.5 max-w-[85%]">
-              <div className={`p-3 rounded-xl text-xs leading-relaxed ${
-                msg.sender === 'user'
-                  ? 'bg-[var(--accent-emerald)] text-white font-medium rounded-tr-none shadow-sm'
-                  : 'bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-tl-none shadow-sm'
-              }`}>
-                <p className="whitespace-pre-wrap">{msg.text}</p>
-              </div>
+
+            <Box sx={{ maxWidth: '85%' }}>
+              <Paper
+                elevation={1}
+                sx={{
+                  p: 1.5,
+                  borderRadius: 1,
+                  bgcolor: msg.sender === 'user' ? 'primary.main' : 'background.paper',
+                  color: msg.sender === 'user' ? '#FFFFFF' : 'text.primary',
+                }}
+              >
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.8125rem', lineHeight: 1.5 }}>
+                  {msg.text}
+                </Typography>
+              </Paper>
 
               {/* Citations / Sources */}
               {msg.sources && msg.sources.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 px-1">
-                  <span className="text-[10px] text-[var(--text-muted)] font-semibold uppercase">Sources:</span>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.5, mt: 0.5, px: 0.5 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.625rem', fontWeight: 700 }}>
+                    SOURCES:
+                  </Typography>
                   {msg.sources.map((s, sIdx) => (
-                    <span key={sIdx} className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[var(--bg-surface-elevated)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
-                      {s}
-                    </span>
+                    <Chip
+                      key={sIdx}
+                      label={s}
+                      size="small"
+                      sx={{ height: 18, fontSize: '0.625rem', borderRadius: 1, fontFamily: 'monospace' }}
+                    />
                   ))}
-                </div>
+                </Box>
               )}
-            </div>
+            </Box>
 
             {msg.sender === 'user' && (
-              <div className="h-7 w-7 rounded-lg bg-[var(--bg-surface-elevated)] text-[var(--text-secondary)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
-                <User className="h-4 w-4" />
-              </div>
+              <Avatar sx={{ bgcolor: 'secondary.main', width: 28, height: 28, borderRadius: 1 }}>
+                <PersonIcon sx={{ fontSize: 16 }} />
+              </Avatar>
             )}
-          </div>
+          </Box>
         ))}
-        
+
         {loading && (
-          <div className="flex gap-2.5 justify-start">
-            <div className="h-7 w-7 rounded-lg bg-[var(--accent-emerald-subtle)] text-[var(--accent-emerald)] border border-[var(--accent-emerald-border)] flex items-center justify-center shrink-0 animate-pulse">
-              <Bot className="h-4 w-4" />
-            </div>
-            <div className="p-3 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl rounded-tl-none text-xs flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-[var(--accent-emerald)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-              <span className="w-1.5 h-1.5 bg-[var(--accent-emerald)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-              <span className="w-1.5 h-1.5 bg-[var(--accent-emerald)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-            </div>
-          </div>
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+            <Avatar sx={{ bgcolor: 'primary.main', width: 28, height: 28, borderRadius: 1 }}>
+              <SmartToyIcon sx={{ fontSize: 16 }} />
+            </Avatar>
+            <Paper elevation={1} sx={{ p: 1.5, borderRadius: 1, bgcolor: 'background.paper', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CircularProgress size={14} color="primary" />
+              <Typography variant="caption" color="text.secondary">
+                Analyzing CPCB documents...
+              </Typography>
+            </Paper>
+          </Box>
         )}
         <div ref={messagesEndRef} />
-      </div>
+      </Box>
 
       {/* Input Form */}
-      <form onSubmit={handleSend} className="bg-[var(--bg-surface-elevated)] p-3 border-t border-[var(--border-subtle)] flex gap-2 shrink-0">
-        <input
-          type="text"
+      <Box
+        component="form"
+        onSubmit={handleSend}
+        sx={{ p: 1.5, display: 'flex', gap: 1, borderTop: 1, borderColor: 'divider', bgcolor: 'background.paper' }}
+      >
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Ask about NAAQS limits, NCAP targets, or GRAP..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about NAAQS limits, NCAP targets, or GRAP stages..."
-          className="flex-1 input-base text-xs py-2 px-3 font-medium"
+          variant="outlined"
+          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1, fontSize: '0.8125rem' } }}
         />
-        <button
+        <IconButton
           type="submit"
+          color="primary"
           disabled={!input.trim() || loading}
-          className="btn-primary text-xs px-3.5 py-2 shrink-0 disabled:opacity-50"
+          sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1 }}
         >
-          <Send className="h-4 w-4" />
-        </button>
-      </form>
-    </div>
+          <SendIcon fontSize="small" />
+        </IconButton>
+      </Box>
+    </Box>
   );
 };
 

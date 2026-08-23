@@ -7,26 +7,28 @@ from typing import List
 router = APIRouter(prefix="/aqi", tags=["aqi"])
 
 @router.get("/current")
-async def get_current_aqi(city: str, at: str = Query(default=None, description="ISO timestamp for historical replay mode")):
+async def get_current_aqi(city: str = Query(default=None), at: str = Query(default=None, description="ISO timestamp for historical replay mode")):
     """
-    Get the most recent AQI and pollutant readings for all active stations in a city.
+    Get the most recent AQI and pollutant readings for all active stations.
+    If `city` is provided, filters to that city only. Otherwise returns all cities.
     With `at`, returns readings as of that historical timestamp (replay mode).
     """
     try:
         at_dt = parse_at(at)
-        # Find all active stations in city
-        cursor = db_helper.stations.find({"city": city.lower(), "active": True})
-        stations = await cursor.to_list(length=100)
+        query = {"active": True}
+        if city:
+            query["city"] = city.lower()
+        cursor = db_helper.stations.find(query)
+        stations = await cursor.to_list(length=500)
 
         results = []
         for station in stations:
             station_id = station["station_id"]
-            # Fetch latest reading (at or before `at` in replay mode)
-            query = {"station_id": station_id}
+            read_query = {"station_id": station_id}
             if at_dt is not None:
-                query["timestamp"] = {"$lte": at_dt}
+                read_query["timestamp"] = {"$lte": at_dt}
             reading = await db_helper.aqi_readings.find_one(
-                query,
+                read_query,
                 sort=[("timestamp", -1)]
             )
 
@@ -36,9 +38,11 @@ async def get_current_aqi(city: str, at: str = Query(default=None, description="
                     "station": {
                         "station_id": station["station_id"],
                         "name": station["name"],
+                        "city": station.get("city", ""),
                         "latitude": station["latitude"],
                         "longitude": station["longitude"],
-                        "zone": station["zone"]
+                        "zone": station["zone"],
+                        "type": station.get("type", "CAAQMS"),
                     },
                     "reading": reading
                 })
@@ -130,24 +134,27 @@ async def get_historical_aqi(station_id: str, start: str, end: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/heatmap")
-async def get_heatmap_data(city: str, at: str = Query(default=None)):
+async def get_heatmap_data(city: str = Query(default=None), at: str = Query(default=None)):
     """
-    Get latitude, longitude, and current AQI value for all stations in a city to draw the heatmap overlay.
+    Get latitude, longitude, and AQI for stations to draw heatmap overlay.
+    If city omitted, returns all cities.
     """
     try:
         at_dt = parse_at(at)
-        cursor = db_helper.stations.find({"city": city.lower(), "active": True})
-        stations = await cursor.to_list(length=100)
+        station_query = {"active": True}
+        if city:
+            station_query["city"] = city.lower()
+        cursor = db_helper.stations.find(station_query)
+        stations = await cursor.to_list(length=500)
 
         heatmap_points = []
         for station in stations:
             station_id = station["station_id"]
-            # Fetch latest reading (as of `at` in replay mode)
-            query = {"station_id": station_id}
+            read_query = {"station_id": station_id}
             if at_dt is not None:
-                query["timestamp"] = {"$lte": at_dt}
+                read_query["timestamp"] = {"$lte": at_dt}
             reading = await db_helper.aqi_readings.find_one(
-                query,
+                read_query,
                 sort=[("timestamp", -1)]
             )
             if reading:
@@ -155,11 +162,13 @@ async def get_heatmap_data(city: str, at: str = Query(default=None)):
                     "lat": station["latitude"],
                     "lng": station["longitude"],
                     "value": reading["aqi"],
-                    "station_name": station["name"]
+                    "station_name": station["name"],
+                    "city": station.get("city", ""),
                 })
         return heatmap_points
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/compare")
 async def compare_cities(cities: str = Query(..., description="Comma-separated list of cities to compare"), at: str = Query(default=None)):

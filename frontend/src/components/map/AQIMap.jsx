@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useTheme } from '@mui/material/styles';
 import { getAqiCategory } from '../../utils/constants';
 
 // Fire-detection icon for stubble-burning back-trajectory fusion
@@ -13,16 +14,15 @@ const fireIcon = L.divIcon({
 });
 
 // Fix for default Leaflet icon marker assets in Vite
-// We override the default icon using a custom SVG marker
 const createCustomMarkerIcon = (aqi, category) => {
   const isSevere = aqi > 300;
   const pulseClass = isSevere ? 'pulse-marker-severe' : '';
   const color = category.color;
   
   const svgHtml = `
-    <div class="relative flex items-center justify-center w-10 h-10">
-      <div class="absolute w-8 h-8 rounded-full ${pulseClass}" style="background-color: ${color}22; border: 2px solid ${color};"></div>
-      <div class="absolute w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-900" style="background-color: ${color};">
+    <div style="position: relative; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px;">
+      <div class="${pulseClass}" style="position: absolute; width: 32px; height: 32px; border-radius: 50%; background-color: ${color}22; border: 2px solid ${color};"></div>
+      <div style="position: absolute; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #0F172A; background-color: ${color};">
         ${Math.round(aqi)}
       </div>
     </div>
@@ -52,53 +52,70 @@ const MapRecenter = ({ center }) => {
   return null;
 };
 
+const MapAutoResize = () => {
+  const map = useMap();
+  useEffect(() => {
+    const timer1 = setTimeout(() => map.invalidateSize(), 100);
+    const timer2 = setTimeout(() => map.invalidateSize(), 500);
+    const handleResize = () => map.invalidateSize();
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [map]);
+  return null;
+};
+
 // Heatmap Layer inside MapContainer
 const LeafletHeatmap = ({ points, visible }) => {
   const map = useMap();
   
   useEffect(() => {
     if (!map || !visible || !points || points.length === 0) return;
-    
-    // Import leaflet.heat dynamically to avoid bundler issues
-    let heatLayer = null;
-    
-    const loadHeat = async () => {
-      try {
-        // Ensure leaflet.heat is loaded
-        await import('leaflet.heat');
-        
-        const heatPoints = points.map(p => [p.lat, p.lng, p.value * 1.5]); // scale intensity
-        
-        heatLayer = L.heatLayer(heatPoints, {
-          radius: 35,
-          blur: 20,
-          maxZoom: 10,
-          max: 400.0,
-          gradient: {
-            0.1: '#00b050',      // Good (green)
-            0.25: '#92d050',     // Satisfactory
-            0.5: '#ffff00',      // Moderate
-            0.7: '#ff9900',      // Poor
-            0.85: '#ff0000',     // Very Poor
-            1.0: '#990000'       // Severe
-          }
-        }).addTo(map);
-      } catch (err) {
-        console.error("Failed to load Leaflet.heat plugin: ", err);
-      }
-    };
 
-    loadHeat();
+    let heatLayer = null;
+    import('leaflet.heat')
+      .then(() => {
+        if (!map || !visible) return;
+        // Use raw AQI value as intensity — max=500 so the full AQI scale maps to full heat
+        const heatData = points.map((p) => [
+          p.lat,
+          p.lng ?? p.lon,
+          p.value ?? p.aqi ?? (p.intensity != null ? p.intensity * 500 : 250),
+        ]);
+
+        heatLayer = L.heatLayer(heatData, {
+          radius: 80,       // large radius so blobs overlap and merge across a city
+          blur: 55,         // heavy blur for smooth continuous gradient
+          maxZoom: 13,
+          max: 500,         // raw AQI scale (0–500)
+          minOpacity: 0.45, // prevent fully invisible blobs
+          gradient: {
+            0.0: '#10B981', // Good  (0–50)
+            0.2: '#84CC16', // Satisfactory (51–100)
+            0.4: '#F59E0B', // Moderate (101–200)
+            0.6: '#F97316', // Poor (201–300)
+            0.8: '#EF4444', // Very Poor (301–400)
+            1.0: '#A855F7', // Severe (400+)
+          },
+        }).addTo(map);
+      })
+      .catch((err) => console.error('Failed to load leaflet.heat:', err));
 
     return () => {
       if (heatLayer && map) {
-        map.removeLayer(heatLayer);
+        try {
+          map.removeLayer(heatLayer);
+        } catch (_) {}
       }
     };
   }, [map, points, visible]);
 
   return null;
 };
+
 
 const AQIMap = ({
   stations,
@@ -109,23 +126,33 @@ const AQIMap = ({
   showVulnerabilities,
   onStationSelect,
   trajectory,
-  showTrajectory
+  showTrajectory,
 }) => {
-  
-  // Custom marker for vulnerable points (schools/hospitals)
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
+  // CartoDB Voyager for high-clarity visible roads and slate terrain in dark/light mode
+  const tileUrl = isDark
+    ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
   const getVulnerableIcon = (type) => {
-    const isHospital = type === 'Hospital';
-    const isSchool = type === 'School';
-    const color = isHospital ? '#ef4444' : (isSchool ? '#3b82f6' : '#f59e0b');
-    
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" width="24" height="24">
-        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+    const t = (type || '').toLowerCase();
+    const isSchool = t === 'school';
+    const color = isSchool ? '#3B82F6' : t.includes('hospital') ? '#EF4444' : '#F59E0B';
+    const svg = isSchool ? `
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+        <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+      </svg>
+    ` : `
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
       </svg>
     `;
     
     return L.divIcon({
-      html: `<div class="w-6 h-6 flex items-center justify-center">${svg}</div>`,
+      html: `<div style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">${svg}</div>`,
       className: 'vulnerable-marker',
       iconSize: [24, 24],
       iconAnchor: [12, 24],
@@ -133,25 +160,28 @@ const AQIMap = ({
   };
 
   return (
-    <div className="w-full h-full relative rounded-xl overflow-hidden border border-slate-800/80 shadow-2xl">
+    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', overflow: 'hidden' }}>
       <MapContainer
         center={center}
         zoom={11}
+        zoomControl={false}
         scrollWheelZoom={true}
         dragging={true}
         doubleClickZoom={true}
         touchZoom={true}
-        style={{ height: '100%', width: '100%' }}
-        className="w-full h-full"
+        style={{ height: '100%', width: '100%', background: isDark ? '#1E293B' : '#F8FAFC' }}
       >
-        {/* Dark Mode Map Tiles */}
+        {/* Zoom controls at topleft */}
+        <ZoomControl position="topleft" />
+
+        {/* CartoDB High-Clarity Themed Map Tiles */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          className="dark-tiles"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url={tileUrl}
         />
 
         <MapRecenter center={center} />
+        <MapAutoResize />
 
         {/* Heatmap overlay */}
         <LeafletHeatmap points={heatmapPoints} visible={showHeatmap} />
@@ -164,6 +194,7 @@ const AQIMap = ({
           
           const cat = getAqiCategory(reading.aqi);
           const icon = createCustomMarkerIcon(reading.aqi, cat);
+          const isLive = reading.source?.startsWith('live') || reading.source === 'api';
 
           return (
             <Marker
@@ -174,30 +205,113 @@ const AQIMap = ({
                 click: () => onStationSelect(station.station_id),
               }}
             >
-              <Popup>
-                <div className="p-1 space-y-2">
-                  <div>
-                    <h4 className="text-sm font-bold text-white">{station.name}</h4>
-                    <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{station.zone}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-2xl font-black" style={{ color: cat.color }}>
-                      {reading.aqi}
-                    </div>
+              <Popup className="custom-aqi-popup">
+                <div style={{ padding: '8px 10px', minWidth: '220px', maxWidth: '270px', fontFamily: 'Inter, sans-serif' }}>
+                  {/* Station Name & Live Source Badge */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                     <div>
-                      <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ backgroundColor: cat.color + '22', color: cat.color }}>
-                        {cat.label}
-                      </span>
+                      <div style={{ fontWeight: 800, fontSize: '13px', color: isDark ? '#F8FAFC' : '#0F172A', lineHeight: 1.2 }}>
+                        {station.name}
+                      </div>
+                      <div style={{ fontSize: '10.5px', color: isDark ? '#94A3B8' : '#64748B', fontWeight: 600, marginTop: '2px' }}>
+                        {station.zone ? `${station.zone} · ` : ''}{station.city ? station.city.toUpperCase() : 'DELHI'}
+                      </div>
                     </div>
+                    <span style={{
+                      fontSize: '8.5px',
+                      fontWeight: 700,
+                      padding: '2px 5px',
+                      borderRadius: '4px',
+                      textTransform: 'uppercase',
+                      backgroundColor: isLive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.15)',
+                      color: isLive ? '#10B981' : (isDark ? '#94A3B8' : '#64748B'),
+                      border: `1px solid ${isLive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(100, 116, 139, 0.3)'}`,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {reading.source?.replace('live:', '⚡ ') || 'Sensor'}
+                    </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs pt-1 border-t border-slate-800 text-slate-300 font-medium">
-                    <div>PM2.5: <span className="font-mono text-slate-100 font-semibold">{reading.pm25} µg/m³</span></div>
-                    <div>PM10: <span className="font-mono text-slate-100 font-semibold">{reading.pm10} µg/m³</span></div>
-                    <div>NO2: <span className="font-mono text-slate-100 font-semibold">{reading.no2} µg/m³</span></div>
-                    <div>SO2: <span className="font-mono text-slate-100 font-semibold">{reading.so2} µg/m³</span></div>
-                    <div>Temp: <span className="font-mono text-slate-100 font-semibold">{reading.temperature}°C</span></div>
-                    <div>Wind: <span className="font-mono text-slate-100 font-semibold">{reading.wind_speed} km/h</span></div>
+
+                  {/* Hero AQI row */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    margin: '8px 0',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.6)' : 'rgba(241, 245, 249, 0.85)',
+                    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)'}`,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                      <span style={{ fontSize: '24px', fontWeight: 900, color: cat.color, fontFamily: 'monospace', lineHeight: 1 }}>
+                        {Math.round(reading.aqi)}
+                      </span>
+                      <span style={{ fontSize: '10px', color: isDark ? '#94A3B8' : '#64748B', fontWeight: 700 }}>AQI</span>
+                    </div>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      backgroundColor: cat.color,
+                      color: '#FFFFFF',
+                      textTransform: 'uppercase',
+                      boxShadow: `0 2px 8px ${cat.color}55`,
+                    }}>
+                      {cat.label}
+                    </span>
                   </div>
+
+                  {/* 6 Pollutants Comprehensive Grid */}
+                  <div style={{
+                    fontSize: '11px',
+                    borderTop: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
+                    paddingTop: '6px',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '4px 8px',
+                    color: isDark ? '#CBD5E1' : '#334155',
+                  }}>
+                    <div>PM2.5: <b style={{ fontFamily: 'monospace' }}>{reading.pm25}</b> <span style={{ fontSize: '9px', opacity: 0.7 }}>µg/m³</span></div>
+                    <div>PM10: <b style={{ fontFamily: 'monospace' }}>{reading.pm10}</b> <span style={{ fontSize: '9px', opacity: 0.7 }}>µg/m³</span></div>
+                    <div>NO2: <b style={{ fontFamily: 'monospace' }}>{reading.no2}</b> <span style={{ fontSize: '9px', opacity: 0.7 }}>µg/m³</span></div>
+                    <div>SO2: <b style={{ fontFamily: 'monospace' }}>{reading.so2}</b> <span style={{ fontSize: '9px', opacity: 0.7 }}>µg/m³</span></div>
+                    <div>CO: <b style={{ fontFamily: 'monospace' }}>{reading.co}</b> <span style={{ fontSize: '9px', opacity: 0.7 }}>mg/m³</span></div>
+                    <div>O3: <b style={{ fontFamily: 'monospace' }}>{reading.o3}</b> <span style={{ fontSize: '9px', opacity: 0.7 }}>µg/m³</span></div>
+                  </div>
+
+                  {/* Live Weather Strip */}
+                  {(reading.temperature != null || reading.humidity != null || reading.wind_speed != null) && (
+                    <div style={{
+                      marginTop: '6px',
+                      paddingTop: '6px',
+                      borderTop: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '10px',
+                      color: isDark ? '#94A3B8' : '#64748B',
+                      fontWeight: 600,
+                    }}>
+                      {reading.temperature != null && <span>🌡️ {reading.temperature}°C</span>}
+                      {reading.humidity != null && <span>💧 {reading.humidity}%</span>}
+                      {reading.wind_speed != null && <span>💨 {reading.wind_speed} km/h</span>}
+                    </div>
+                  )}
+
+                  {/* Health Advisory note */}
+                  {cat.health && (
+                    <div style={{
+                      marginTop: '6px',
+                      paddingTop: '4px',
+                      fontSize: '10px',
+                      color: cat.color,
+                      fontWeight: 600,
+                      lineHeight: 1.3,
+                    }}>
+                      ⚠️ {cat.health}
+                    </div>
+                  )}
                 </div>
               </Popup>
             </Marker>
@@ -209,25 +323,25 @@ const AQIMap = ({
           <>
             <Polyline
               positions={trajectory.path.map((p) => [p.lat, p.lon])}
-              pathOptions={{ color: '#a855f7', weight: 3, opacity: 0.85, dashArray: '6 6' }}
+              pathOptions={{ color: '#00B4D8', weight: 3, opacity: 0.9, dashArray: '6 6' }}
             />
-            {/* Full fire field (dim), so the crossed subset reads in context */}
+            {/* Full fire field (dim) */}
             {trajectory.all_fires && trajectory.all_fires.map((f, i) => (
               <CircleMarker
                 key={`fa-${i}`}
                 center={[f.lat, f.lon]}
                 radius={3}
-                pathOptions={{ color: '#f97316', fillColor: '#f97316', fillOpacity: 0.35, weight: 0 }}
+                pathOptions={{ color: '#F97316', fillColor: '#F97316', fillOpacity: 0.4, weight: 0 }}
               />
             ))}
             {/* Crossed fires (bright) */}
             {trajectory.intersections && trajectory.intersections.map((f, i) => (
               <Marker key={`fx-${i}`} position={[f.lat, f.lon]} icon={fireIcon}>
                 <Popup>
-                  <div className="p-1 text-xs">
-                    <div className="font-bold text-white">Active fire — {f.district}</div>
-                    <div className="text-slate-400">Crossed the air mass ~{f.hours_ago}h upwind</div>
-                    {f.frp != null && <div className="text-slate-400">FRP: {f.frp} MW · {f.distance_km} km off-path</div>}
+                  <div style={{ padding: '4px', fontSize: '11px' }}>
+                    <div style={{ fontWeight: 700 }}>Active fire — {f.district}</div>
+                    <div style={{ color: '#64748B' }}>Crossed air mass ~{f.hours_ago}h upwind</div>
+                    {f.frp != null && <div style={{ color: '#64748B' }}>FRP: {f.frp} MW · {f.distance_km} km off-path</div>}
                   </div>
                 </Popup>
               </Marker>
@@ -236,7 +350,7 @@ const AQIMap = ({
             <CircleMarker
               center={[trajectory.origin.lat, trajectory.origin.lon]}
               radius={6}
-              pathOptions={{ color: '#a855f7', fillColor: '#c084fc', fillOpacity: 0.9 }}
+              pathOptions={{ color: '#00B4D8', fillColor: '#03DAC6', fillOpacity: 0.9 }}
             />
           </>
         )}
@@ -249,11 +363,11 @@ const AQIMap = ({
             icon={getVulnerableIcon(item.type)}
           >
             <Popup>
-              <div className="p-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+              <div style={{ padding: '4px' }}>
+                <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', padding: '2px 6px', borderRadius: '4px', backgroundColor: '#F1F5F9', color: '#334155' }}>
                   {item.type}
                 </span>
-                <h4 className="text-xs font-bold text-white mt-1.5">{item.name}</h4>
+                <div style={{ fontSize: '12px', fontWeight: 700, marginTop: '4px' }}>{item.name}</div>
               </div>
             </Popup>
           </Marker>

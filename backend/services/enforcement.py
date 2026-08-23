@@ -230,7 +230,7 @@ class EnforcementService:
         analysis = await analyze_enforcement_action(action)
         if analysis is None:
             raise RuntimeError(
-                "AI compound-risk analysis is unavailable (no GEMINI_API_KEY configured, "
+                "AI compound-risk analysis is unavailable (no GROQ_API_KEY configured, "
                 "or the agent call failed)."
             )
 

@@ -1,5 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Database, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  Grid,
+  Chip,
+  Paper,
+  CircularProgress
+} from '@mui/material';
+import StorageIcon from '@mui/icons-material/Storage';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { dataApi } from '../../services/api';
 
 const GovFeedPanel = () => {
@@ -16,65 +28,107 @@ const GovFeedPanel = () => {
   }, []);
 
   return (
-    <div className="bento-card p-5 space-y-3.5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Database className="h-4 w-4 text-[var(--accent-sky)]" />
-          <h3 className="text-xs font-heading font-bold text-[var(--text-primary)] uppercase tracking-wider">
-            Official CPCB CAAQMS Feed · data.gov.in
-          </h3>
-        </div>
-        {loading ? (
-          <Loader2 className="h-3.5 w-3.5 text-[var(--text-muted)] animate-spin" />
-        ) : cov?.available ? (
-          <span className="flex items-center gap-1 text-[10px] font-heading font-bold uppercase tracking-wider text-[var(--accent-emerald)] bg-[var(--accent-emerald-subtle)] px-2 py-0.5 rounded border border-[var(--accent-emerald-border)]">
-            <CheckCircle2 className="h-3 w-3" /> Live Feed
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 text-[10px] font-heading font-bold uppercase tracking-wider text-[var(--accent-amber)] bg-[var(--accent-amber-subtle)] px-2 py-0.5 rounded border border-[var(--accent-amber-border)]">
-            <AlertCircle className="h-3 w-3" /> Curated Mode
-          </span>
-        )}
-      </div>
+    <Card elevation={1} sx={{ borderRadius: 1 }}>
+      <CardContent sx={{ p: 2.5 }}>
+        {/* Header */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <StorageIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, textTransform: 'uppercase' }}>
+              Official CPCB CAAQMS Feed · data.gov.in
+            </Typography>
+          </Box>
+          {loading ? (
+            <CircularProgress size={16} color="primary" />
+          ) : cov?.available ? (
+            <Chip
+              icon={<CheckCircleIcon sx={{ fontSize: '1rem !important' }} />}
+              label="Live Feed"
+              size="small"
+              color="success"
+              sx={{ borderRadius: 1, fontWeight: 700 }}
+            />
+          ) : (
+            <Chip
+              icon={<InfoOutlinedIcon sx={{ fontSize: '1rem !important' }} />}
+              label="Curated Mode"
+              size="small"
+              color="warning"
+              sx={{ borderRadius: 1, fontWeight: 700 }}
+            />
+          )}
+        </Box>
 
-      {cov?.available ? (
-        <>
-          <div className="grid grid-cols-3 gap-2">
-            <Stat value={cov.total_available ?? '—'} label="Active Records" />
-            <Stat value={cov.distinct_cities} label="Cities Ingested" />
-            <Stat value={cov.distinct_states} label="States Covered" />
-          </div>
-          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-            Directly ingests the national CPCB CAAQMS feed with instant onboarding across <span className="font-bold text-[var(--text-primary)]">500+ monitoring stations</span> nationwide.
-          </p>
-          {cov.sample_cities?.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {cov.sample_cities.slice(0, 8).map((c) => (
-                <span key={c} className="text-[10px] font-heading font-semibold px-2 py-0.5 rounded bg-[var(--bg-surface-elevated)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">{c}</span>
-              ))}
-            </div>
-          )}
-          <p className="text-[10px] text-[var(--text-muted)] font-mono">{cov.license}</p>
-        </>
-      ) : (
-        <div className="space-y-2">
-          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-            Government data adapter is verified. Active stream routed through high-frequency curated stations & fallback simulator.
-          </p>
-          {cov?.published_scale && (
-            <p className="text-xs text-[var(--text-primary)] font-heading font-semibold">{cov.published_scale}</p>
-          )}
-        </div>
-      )}
-    </div>
+        {cov?.available ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={4}>
+                <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderRadius: 1, bgcolor: 'background.default' }}>
+                  <Typography variant="h5" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>
+                    {cov.total_available ?? '—'}
+                  </Typography>
+                  <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.625rem' }}>
+                    ACTIVE RECORDS
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderRadius: 1, bgcolor: 'background.default' }}>
+                  <Typography variant="h5" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>
+                    {cov.distinct_cities}
+                  </Typography>
+                  <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.625rem' }}>
+                    CITIES INGESTED
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderRadius: 1, bgcolor: 'background.default' }}>
+                  <Typography variant="h5" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>
+                    {cov.distinct_states}
+                  </Typography>
+                  <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.625rem' }}>
+                    STATES COVERED
+                  </Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+
+            <Typography variant="body2" color="text.secondary">
+              Directly ingests the national CPCB CAAQMS feed with instant onboarding across{' '}
+              <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                500+ monitoring stations
+              </Box>{' '}
+              nationwide.
+            </Typography>
+
+            {cov.sample_cities?.length > 0 && (
+              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                {cov.sample_cities.slice(0, 8).map((c) => (
+                  <Chip key={c} label={c} size="small" variant="outlined" sx={{ borderRadius: 1, fontSize: '0.6875rem' }} />
+                ))}
+              </Box>
+            )}
+
+            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+              {cov.license}
+            </Typography>
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Government data adapter is verified. Active stream routed through high-frequency curated stations & fallback simulator.
+            </Typography>
+            {cov?.published_scale && (
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {cov.published_scale}
+              </Typography>
+            )}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
   );
 };
-
-const Stat = ({ value, label }) => (
-  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-elevated)] p-2.5 text-center">
-    <div className="text-lg font-mono font-bold text-[var(--text-primary)] leading-none">{value}</div>
-    <div className="text-[10px] font-heading font-semibold uppercase text-[var(--text-muted)] mt-1">{label}</div>
-  </div>
-);
 
 export default GovFeedPanel;

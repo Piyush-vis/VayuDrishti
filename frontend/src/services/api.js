@@ -37,10 +37,10 @@ export const stationsApi = {
 };
 
 export const aqiApi = {
-  current: (city) => apiClient.get(`/aqi/current?city=${city}`).then(r => r.data),
+  current: (city) => apiClient.get(`/aqi/current${city ? `?city=${city}` : ''}`).then(r => r.data),
   at: (city, hoursAgo) => apiClient.get(`/aqi/at?city=${city}&hours_ago=${hoursAgo}`).then(r => r.data),
   history: (id, start, end) => apiClient.get(`/aqi/history?station_id=${id}&start=${start}&end=${end}`).then(r => r.data),
-  heatmap: (city) => apiClient.get(`/aqi/heatmap?city=${city}`).then(r => r.data),
+  heatmap: (city) => apiClient.get(`/aqi/heatmap${city ? `?city=${city}` : ''}`).then(r => r.data),
   compare: (cities) => apiClient.get(`/aqi/compare?cities=${cities}`).then(r => r.data),
 };
 

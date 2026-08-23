@@ -1,5 +1,18 @@
 import React, { useState } from 'react';
-import { Phone, Volume2, Square, MessageCircle } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  Button,
+  Grid,
+  Paper,
+  Chip
+} from '@mui/material';
+import PhoneIcon from '@mui/icons-material/Phone';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import StopIcon from '@mui/icons-material/Stop';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { useSpeech } from '../../hooks/useSpeech';
 
 const IVR_LANGS = [
@@ -10,7 +23,7 @@ const IVR_LANGS = [
 ];
 
 const IVRPreview = ({ advisories, category, zone }) => {
-  const { supported, speak, stop, speakingKey, hasVoiceFor } = useSpeech();
+  const { supported, speak, stop, speakingKey } = useSpeech();
   const [lang, setLang] = useState('hi');
 
   const line = advisories?.general?.[lang] || advisories?.general?.en || '';
@@ -23,74 +36,91 @@ const IVRPreview = ({ advisories, category, zone }) => {
   const fullMessage = `${greeting} ${line}`;
 
   return (
-    <div className="bento-card p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Phone className="h-4 w-4 text-[var(--accent-emerald)]" />
-          <h4 className="text-xs font-heading font-bold text-[var(--text-primary)] uppercase tracking-wider">
-            IVR Voice & WhatsApp Broadcast
-          </h4>
-        </div>
-        <span className="text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-[var(--bg-surface-elevated)] border border-[var(--border-subtle)] text-[var(--text-muted)]">
-          Live Synthesizer
-        </span>
-      </div>
+    <Card elevation={1} sx={{ borderRadius: 1 }}>
+      <CardContent sx={{ p: 2.5 }}>
+        {/* Header */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PhoneIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, textTransform: 'uppercase' }}>
+              IVR Voice & WhatsApp
+            </Typography>
+          </Box>
+          <Chip label="Live Synthesizer" size="small" variant="outlined" sx={{ borderRadius: 1, height: 20, fontSize: '0.6875rem' }} />
+        </Box>
 
-      {/* Phone Mockup Frame */}
-      <div className="mx-auto max-w-[240px] rounded-2xl border-2 border-[var(--border-active)] bg-[var(--bg-surface-elevated)] p-3 shadow-lg">
-        <div className="text-center border-b border-[var(--border-subtle)] pb-2 mb-2">
-          <div className="text-[10px] text-[var(--text-muted)] font-mono">Incoming Alert · 1800-VAYU</div>
-          <div className="text-xs text-[var(--accent-emerald)] font-heading font-bold">CPCB Air Emergency Desk</div>
-        </div>
-        <div className="text-[11px] text-[var(--text-secondary)] mb-2 leading-tight text-center">
-          "Press key for regional language / भाषा चुनें"
-        </div>
-        <div className="grid grid-cols-2 gap-1.5 mb-2.5">
-          {IVR_LANGS.map((l) => (
-            <button
-              key={l.code}
-              onClick={() => setLang(l.code)}
-              className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-heading font-semibold border transition-all cursor-pointer ${
-                lang === l.code
-                  ? 'bg-[var(--accent-emerald-subtle)] border-[var(--accent-emerald-border)] text-[var(--accent-emerald)]'
-                  : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <span className="font-mono text-[10px] bg-[var(--bg-surface-elevated)] rounded px-1">{l.key}</span>
-              <span>{l.label}</span>
-            </button>
-          ))}
-        </div>
+        {/* Phone Frame */}
+        <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 1, bgcolor: 'background.default' }}>
+          <Box sx={{ textAlign: 'center', pb: 1, mb: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontFamily: 'monospace' }}>
+              Incoming Alert · 1800-VAYU
+            </Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+              CPCB Air Emergency Desk
+            </Typography>
+          </Box>
 
-        {/* WhatsApp message bubble */}
-        <div className="bg-[var(--accent-emerald-subtle)] border border-[var(--accent-emerald-border)] rounded-lg rounded-tl-none p-2">
-          <div className="flex items-center gap-1 text-[10px] text-[var(--accent-emerald)] font-bold uppercase tracking-wider mb-1">
-            <MessageCircle className="h-3 w-3" /> {zone || 'NCR'} · {category || 'Advisory'}
-          </div>
-          <p className="text-xs text-[var(--text-primary)] leading-snug">{line || 'Processing advisory alert...'}</p>
-        </div>
-      </div>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mb: 1 }}>
+            "Press key for regional language / भाषा चुनें"
+          </Typography>
 
-      {/* TTS Speech Trigger */}
-      <div className="flex items-center gap-2">
-        {speakingKey === 'ivr' ? (
-          <button
-            onClick={stop}
-            className="w-full btn-secondary text-xs text-[var(--accent-crimson)] border-[var(--accent-crimson-border)] bg-[var(--accent-crimson-subtle)] py-2"
+          <Grid container spacing={1} sx={{ mb: 2 }}>
+            {IVR_LANGS.map((l) => (
+              <Grid item xs={6} key={l.code}>
+                <Button
+                  fullWidth
+                  size="small"
+                  variant={lang === l.code ? 'contained' : 'outlined'}
+                  color={lang === l.code ? 'primary' : 'inherit'}
+                  onClick={() => setLang(l.code)}
+                  sx={{ borderRadius: 1, py: 0.5, fontSize: '0.75rem' }}
+                >
+                  <Box component="span" sx={{ fontFamily: 'monospace', fontWeight: 700, mr: 0.5 }}>
+                    [{l.key}]
+                  </Box>
+                  {l.label}
+                </Button>
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* WhatsApp message bubble */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 1.5,
+              borderRadius: 1,
+              bgcolor: 'rgba(0, 180, 216, 0.08)',
+              border: 1,
+              borderColor: 'rgba(0, 180, 216, 0.25)',
+            }}
           >
-            <Square className="h-3.5 w-3.5" /> Stop Voice Broadcast
-          </button>
-        ) : (
-          <button
-            onClick={() => speak(fullMessage, lang, 'ivr')}
-            disabled={!supported}
-            className="w-full btn-primary text-xs py-2 disabled:opacity-40"
-          >
-            <Volume2 className="h-3.5 w-3.5" /> Play Voice Broadcast
-          </button>
-        )}
-      </div>
-    </div>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5, color: 'primary.main' }}>
+              <WhatsAppIcon sx={{ fontSize: 16 }} />
+              <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase' }}>
+                {zone || 'NCR'} · {category || 'Advisory'}
+              </Typography>
+            </Box>
+            <Typography variant="body2" sx={{ fontSize: '0.8125rem', lineHeight: 1.4 }}>
+              {line || 'Processing advisory alert...'}
+            </Typography>
+          </Paper>
+        </Paper>
+
+        {/* TTS Speech Trigger Button */}
+        <Button
+          fullWidth
+          variant="contained"
+          color={speakingKey === 'ivr' ? 'error' : 'primary'}
+          startIcon={speakingKey === 'ivr' ? <StopIcon /> : <VolumeUpIcon />}
+          onClick={() => (speakingKey === 'ivr' ? stop() : speak(fullMessage, lang, 'ivr'))}
+          disabled={!supported}
+          sx={{ borderRadius: 1 }}
+        >
+          {speakingKey === 'ivr' ? 'Stop Voice Broadcast' : 'Play Voice Broadcast'}
+        </Button>
+      </CardContent>
+    </Card>
   );
 };
 

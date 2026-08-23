@@ -1,37 +1,41 @@
 import React from 'react';
+import { Box, Typography } from '@mui/material';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '@mui/material/styles';
 
 const SourcePieChart = ({ attributions }) => {
-  const { isDark } = useTheme();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
 
   if (!attributions) {
     return (
-      <div className="h-44 flex items-center justify-center text-xs text-[var(--text-muted)] font-heading">
-        No source attribution telemetry available.
-      </div>
+      <Box sx={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="caption" color="text.secondary">
+          No source attribution telemetry available.
+        </Typography>
+      </Box>
     );
   }
 
   const data = [
-    { name: 'Vehicular', value: Math.round((attributions.vehicular || 0) * 100), color: isDark ? '#38BDF8' : '#0284C7' },
-    { name: 'Industrial', value: Math.round((attributions.industrial || 0) * 100), color: isDark ? '#F87171' : '#DC2626' },
-    { name: 'Construction', value: Math.round((attributions.construction || 0) * 100), color: isDark ? '#FBBF24' : '#D97706' },
-    { name: 'Biomass Burning', value: Math.round((attributions.biomass_burning || 0) * 100), color: isDark ? '#A78BFA' : '#7C3AED' },
-    { name: 'Secondary/Other', value: Math.round((attributions.other || 0) * 100), color: isDark ? '#64748B' : '#94A3B8' }
+    { name: 'Vehicular', value: Math.round((attributions.vehicular || 0) * 100), color: isDark ? '#00B4D8' : '#0284C7' },
+    { name: 'Industrial', value: Math.round((attributions.industrial || 0) * 100), color: isDark ? '#CF6679' : '#DC2626' },
+    { name: 'Construction', value: Math.round((attributions.construction || 0) * 100), color: isDark ? '#FFB74D' : '#D97706' },
+    { name: 'Biomass Burning', value: Math.round((attributions.biomass_burning || 0) * 100), color: isDark ? '#B388FF' : '#7C3AED' },
+    { name: 'Secondary/Other', value: Math.round((attributions.other || 0) * 100), color: isDark ? '#78909C' : '#94A3B8' }
   ].filter(d => d.value > 0);
 
   return (
-    <div className="w-full flex flex-col justify-center space-y-3">
-      <div className="h-36">
+    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+      <Box sx={{ height: 140, width: '100%' }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={38}
-              outerRadius={54}
+              innerRadius={36}
+              outerRadius={52}
               paddingAngle={3}
               dataKey="value"
             >
@@ -42,29 +46,34 @@ const SourcePieChart = ({ attributions }) => {
             <Tooltip 
               formatter={(value) => [`${value}%`, 'Contribution']}
               contentStyle={{
-                backgroundColor: isDark ? '#131B2A' : '#FFFFFF',
-                borderColor: isDark ? '#233044' : '#E2E8F0',
-                borderRadius: '8px',
-                fontFamily: 'var(--font-mono)',
+                backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
+                borderColor: isDark ? '#333333' : '#E2E8F0',
+                borderRadius: '4px',
+                fontFamily: 'monospace',
                 fontSize: '11px',
-                color: isDark ? '#F8FAFC' : '#0F172A'
+                color: isDark ? '#FFFFFF' : '#0F172A',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
               }}
             />
           </PieChart>
         </ResponsiveContainer>
-      </div>
+      </Box>
       
       {/* Legend with clean badges */}
-      <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs font-heading font-medium">
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, width: '100%' }}>
         {data.map((item, idx) => (
-          <div key={idx} className="flex items-center gap-1.5 truncate">
-            <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-            <span className="truncate text-[var(--text-secondary)]">{item.name}:</span>
-            <span className="font-mono font-bold text-[var(--text-primary)]">{item.value}%</span>
-          </div>
+          <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1, overflow: 'hidden' }}>
+            <Box sx={{ width: 8, height: 8, borderRadius: '2px', bgcolor: item.color, flexShrink: 0 }} />
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {item.name}:
+            </Typography>
+            <Typography variant="caption" sx={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '0.6875rem' }}>
+              {item.value}%
+            </Typography>
+          </Box>
         ))}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 };
 

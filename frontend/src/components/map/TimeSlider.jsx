@@ -1,7 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw } from 'lucide-react';
+import {
+  Paper,
+  Box,
+  Typography,
+  IconButton,
+  Slider,
+  Chip
+} from '@mui/material';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import { useTheme } from '@mui/material/styles';
 
 const TimeSlider = ({ onChange, startHour = -24, endHour = 0 }) => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
   const [value, setValue] = useState(endHour);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -39,49 +53,106 @@ const TimeSlider = ({ onChange, startHour = -24, endHour = 0 }) => {
   };
 
   const getLabel = (val) => {
-    if (val === 0) return "Live / Current";
-    return `${Math.abs(val)} hours ago`;
+    if (val === 0) return 'Live / Current';
+    // Show the exact UTC date+time the slider points to (IST-aware)
+    const target = new Date(Date.now() + val * 60 * 60 * 1000);
+    return target.toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
   };
 
   return (
-    <div className="absolute bottom-6 left-6 z-[1000] p-4 bg-slate-900/90 backdrop-blur-md border border-slate-800/80 rounded-xl flex items-center gap-4 w-[calc(100%-3rem)] max-w-lg shadow-2xl">
-      <button
+    <Paper
+      elevation={4}
+      sx={{
+        p: 1.5,
+        borderRadius: 1,
+        bgcolor: isDark ? 'rgba(30, 30, 30, 0.92)' : 'rgba(255, 255, 255, 0.96)',
+        backdropFilter: 'blur(12px)',
+        border: 1,
+        borderColor: 'divider',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.5,
+        width: '100%',
+        boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.12)',
+      }}
+    >
+      <IconButton
+        size="small"
+        color="primary"
         onClick={togglePlay}
-        className="p-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white transition-all active:scale-95 flex items-center justify-center shrink-0"
-        title={isPlaying ? "Pause Timelapse" : "Play Timelapse"}
+        title={isPlaying ? 'Pause Timelapse' : 'Play Timelapse'}
+        sx={{
+          bgcolor: 'primary.main',
+          color: '#FFF',
+          '&:hover': { bgcolor: 'primary.dark' },
+          borderRadius: 1,
+          width: 32,
+          height: 32,
+        }}
       >
-        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-      </button>
+        {isPlaying ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
+      </IconButton>
 
-      <button
+      <IconButton
+        size="small"
         onClick={resetSlider}
-        className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-all active:scale-95 flex items-center justify-center shrink-0 border border-slate-700/50"
         title="Reset to Live"
+        sx={{
+          border: 1,
+          borderColor: 'divider',
+          borderRadius: 1,
+          width: 32,
+          height: 32,
+          color: 'text.secondary',
+          '&:hover': { color: 'text.primary' },
+        }}
       >
-        <RotateCcw className="h-4 w-4" />
-      </button>
+        <RestartAltIcon fontSize="small" />
+      </IconButton>
 
-      <div className="flex-1 space-y-1.5">
-        <div className="flex justify-between items-center text-xs font-semibold text-slate-300">
-          <span>{startHour}H (Past)</span>
-          <span className="text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
-            {getLabel(value)}
-          </span>
-          <span>Live</span>
-        </div>
-        <input
-          type="range"
+      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.25 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.6875rem' }}>
+            {startHour}H (Past)
+          </Typography>
+          <Chip
+            label={getLabel(value)}
+            size="small"
+            color="primary"
+            variant="outlined"
+            sx={{
+              height: 20,
+              fontSize: '0.6875rem',
+              fontFamily: 'monospace',
+              fontWeight: 700,
+              borderRadius: 1,
+              bgcolor: isDark ? 'rgba(0, 180, 216, 0.12)' : 'rgba(0, 180, 216, 0.08)',
+            }}
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.6875rem' }}>
+            Live
+          </Typography>
+        </Box>
+        <Slider
           min={startHour}
           max={endHour}
           value={value}
-          onChange={(e) => {
+          onChange={(_, val) => {
             setIsPlaying(false);
-            setValue(parseInt(e.target.value));
+            setValue(val);
           }}
-          className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+          size="small"
+          color="primary"
+          sx={{ py: 0.5 }}
         />
-      </div>
-    </div>
+      </Box>
+    </Paper>
   );
 };
 

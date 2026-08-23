@@ -1,36 +1,52 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { Box, Paper, Fab, Tooltip } from '@mui/material';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+
 import Navbar from './components/layout/Navbar';
 import Sidebar from './components/layout/Sidebar';
 import ChatPanel from './components/panels/ChatPanel';
 
-// Pages
 import Dashboard from './pages/Dashboard';
-import WarRoom from './pages/WarRoom';
 import Predictions from './pages/Predictions';
 import Enforcement from './pages/Enforcement';
+import WarRoom from './pages/WarRoom';
 import Advisory from './pages/Advisory';
 import Compare from './pages/Compare';
 
-// Hooks
-import { useAQIData } from './hooks/useAQIData';
-import { useStations } from './hooks/useStations';
-import ReplayBanner from './components/common/ReplayBanner';
-
-import { MessageSquareCode, Sparkles } from 'lucide-react';
+import { aqiApi, attributionApi, stationsApi, predictApi, advisoryApi } from './services/api';
+import { useReplay } from './context/ReplayContext';
 
 function App() {
   const [activeCity, setActiveCity] = useState('delhi');
-  const [selectedStationId, setSelectedStationId] = useState('');
+  const [currentReadings, setCurrentReadings] = useState([]);  // city-filtered, for analytics
+  const [allReadings, setAllReadings] = useState([]);           // all cities, for map
+  const [heatmapPoints, setHeatmapPoints] = useState([]);       // all cities heatmap
+  const [vulnerabilities, setVulnerabilities] = useState([]);
+  const [dataFreshness, setDataFreshness] = useState(null);
   const [showChat, setShowChat] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // Cross-page shared telemetry state
+  const [selectedStationId, setSelectedStationId] = useState(null);
+  const [trendReadings, setTrendReadings] = useState([]);
+  const [attributions, setAttributions] = useState(null);
+
+  // Predictions page state
+  const [forecast, setForecast] = useState([]);
+  const [forecastMeta, setForecastMeta] = useState(null);
+  const [explanation, setExplanation] = useState(null);
+  const [forecastAlerts, setForecastAlerts] = useState([]);
+
+  const { replayAtDebounced } = useReplay();
+
+  // Refs for Chat dialog click-outside handling
   const chatContainerRef = useRef(null);
   const chatButtonRef = useRef(null);
 
-  // Close chatbot when clicking outside or pressing Escape
   useEffect(() => {
-    const handlePointerDownOutside = (event) => {
+    const handleClickOutside = (event) => {
       if (
         showChat &&
         chatContainerRef.current &&
@@ -48,62 +64,142 @@ function App() {
       }
     };
 
-    document.addEventListener('mousedown', handlePointerDownOutside);
-    document.addEventListener('touchstart', handlePointerDownOutside);
+    document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.removeEventListener('mousedown', handlePointerDownOutside);
-      document.removeEventListener('touchstart', handlePointerDownOutside);
+      document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [showChat]);
 
-  // Custom hooks to manage state and logic
-  const { 
-    currentReadings, 
-    setCurrentReadings, 
-    heatmapPoints, 
-    vulnerabilities, 
-    alerts, 
-    syncTime, 
-    fetchBaseData 
-  } = useAQIData(activeCity);
+  // Primary data fetch routine
+  const fetchBaseData = async () => {
+    // Each fetch is isolated — one failure won't abort the others
 
-  const {
-    selectedStation,
-    trendReadings,
-    forecast,
-    forecastMeta,
-    explanation,
-    attributions
-  } = useStations(selectedStationId, activeCity);
+    // 1. City-filtered readings for analytics cards/charts
+    try {
+      const readings = await aqiApi.current(activeCity);
+      setCurrentReadings(readings);
+      if (readings.length > 0) {
+        setDataFreshness(
+          new Date(readings[0].reading.timestamp).toLocaleString('en-IN', {
+            day: 'numeric', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false,
+            timeZoneName: 'short',
+          })
+        );
+        if (!selectedStationId) {
+          setSelectedStationId(readings[0].station.station_id);
+        }
+      }
+    } catch (err) { console.error('currentReadings fetch failed:', err.message); }
+
+    // 2. All-city readings for the map (no city filter)
+    try {
+      const allData = await aqiApi.current();
+      setAllReadings(allData);
+    } catch (err) { console.error('allReadings fetch failed:', err.message); }
+
+    // 3. All-city heatmap points
+    try {
+      const heat = await aqiApi.heatmap();
+      setHeatmapPoints(Array.isArray(heat) ? heat : []);
+    } catch (err) { console.error('heatmap fetch failed:', err.message); }
+
+    // 4. Vulnerability overlays (city-specific)
+    try {
+      const vulns = await advisoryApi.vulnerabilityMap(activeCity);
+      setVulnerabilities(Array.isArray(vulns) ? vulns : []);
+    } catch (err) { console.error('vulnerabilities fetch failed:', err.message); }
+  };
+
+  useEffect(() => {
+    fetchBaseData();
+  }, [activeCity, replayAtDebounced]);
+
+  // Station deep-dive telemetry synchronizer
+  useEffect(() => {
+    if (!selectedStationId) return;
+
+    let isMounted = true;
+    const fetchStationData = async () => {
+      try {
+        // 24h trend uses /stations/{id}/readings?hours=24
+        const trend = await stationsApi.readings(selectedStationId, 24);
+        if (isMounted) setTrendReadings(trend);
+
+        // Attribution
+        const currentStation = currentReadings.find(r => r.station.station_id === selectedStationId);
+        if (currentStation) {
+          const attr = await attributionApi.sources(activeCity, currentStation.station.zone);
+          if (isMounted) setAttributions(attr);
+        }
+
+        // Forecast for Predictions page
+        const fc = await predictApi.forecast(selectedStationId, 72);
+        if (isMounted) {
+          setForecast(fc.predictions || []);
+          setForecastMeta({
+            modelVersion: fc.model_version,
+            rmse: fc.rmse,
+            horizonMetrics: fc.horizon_metrics,
+            provenance: fc.provenance,
+          });
+        }
+
+        // SHAP explanation at 24h horizon
+        const exp = await predictApi.explain(selectedStationId, 24);
+        if (isMounted) setExplanation(exp);
+
+        // Forecast breach alerts
+        const alerts = await predictApi.alerts(activeCity);
+        if (isMounted) setForecastAlerts(Array.isArray(alerts) ? alerts : []);
+      } catch (err) {
+        console.error('Error fetching station detailed metrics:', err);
+      }
+    };
+
+    fetchStationData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedStationId, activeCity, currentReadings, replayAtDebounced]);
+
+  const selectedStation = currentReadings.find(r => r.station.station_id === selectedStationId)?.station;
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)] transition-colors">
-      {/* Top Navbar */}
-      <Navbar 
-        activeCity={activeCity} 
-        onCityChange={(c) => {
-          setActiveCity(c);
-          setSelectedStationId('');
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default', color: 'text.primary' }}>
+      {/* Sidebar Navigation (Toggleable) */}
+      <Sidebar open={sidebarOpen} />
+
+      {/* Main Content Area */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minWidth: 0,
+          transition: (theme) =>
+            theme.transitions.create(['margin', 'width'], {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.standard,
+            }),
         }}
-        dataFreshness={syncTime}
-        onRefresh={fetchBaseData}
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
-      />
+      >
+        <Navbar 
+          activeCity={activeCity}
+          onCityChange={setActiveCity}
+          dataFreshness={dataFreshness}
+          onRefresh={fetchBaseData}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        />
 
-      {/* Historical replay strip (only visible when an episode is active) */}
-      <ReplayBanner />
-
-      {/* Main Container */}
-      <div className="flex flex-1 overflow-hidden w-full">
-        {/* Left Navigation Sidebar */}
-        <Sidebar isOpen={sidebarOpen} />
-
-        {/* Tab Pages with React Router */}
-        <main className="flex-1 flex flex-col overflow-y-auto p-4 lg:p-6 space-y-6">
+        <Box sx={{ p: { xs: 2, sm: 3 }, flexGrow: 1, overflowY: 'auto' }}>
           <Routes>
             <Route 
               path="/" 
@@ -111,6 +207,7 @@ function App() {
                 <Dashboard 
                   activeCity={activeCity}
                   currentReadings={currentReadings}
+                  allReadings={allReadings}
                   setCurrentReadings={setCurrentReadings}
                   heatmapPoints={heatmapPoints}
                   vulnerabilities={vulnerabilities}
@@ -123,19 +220,21 @@ function App() {
                 />
               } 
             />
-            <Route
-              path="/war-room"
-              element={<WarRoom activeCity={activeCity} />}
+            <Route 
+              path="/war-room" 
+              element={<WarRoom activeCity={activeCity} />} 
             />
-            <Route
-              path="/predictions"
+            <Route 
+              path="/predictions" 
               element={
-                <Predictions
-                  selectedStation={selectedStation}
+                <Predictions 
+                  activeCity={activeCity} 
+                  selectedStation={selectedStation} 
+                  selectedStationId={selectedStationId}
                   forecast={forecast}
                   forecastMeta={forecastMeta}
                   explanation={explanation}
-                  alerts={alerts}
+                  alerts={forecastAlerts}
                 />
               } 
             />
@@ -143,8 +242,8 @@ function App() {
               path="/enforcement" 
               element={
                 <Enforcement 
-                  activeCity={activeCity}
-                  fetchBaseData={fetchBaseData}
+                  activeCity={activeCity} 
+                  selectedStation={selectedStation}
                 />
               } 
             />
@@ -152,7 +251,7 @@ function App() {
               path="/advisory" 
               element={
                 <Advisory 
-                  activeCity={activeCity}
+                  activeCity={activeCity} 
                   selectedStation={selectedStation}
                   currentReadings={currentReadings}
                 />
@@ -163,41 +262,55 @@ function App() {
               element={<Compare />} 
             />
           </Routes>
-        </main>
-      </div>
+        </Box>
+      </Box>
 
-      {/* Floating CPCB Regulations Chatbot */}
-      <div className="fixed bottom-5 right-5 z-[2000] flex flex-col items-end">
-        {/* Chat Window Popup with outside click ref */}
+      {/* Floating CPCB Regulations Chatbot Dialog / Premium Circular FAB */}
+      <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
         {showChat && (
-          <div 
+          <Paper
             ref={chatContainerRef}
-            className="mb-3 w-[340px] sm:w-[420px] shadow-2xl rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)] animate-in fade-in slide-in-from-bottom-3 duration-150"
+            elevation={8}
+            sx={{
+              mb: 2,
+              width: { xs: 320, sm: 420 },
+              borderRadius: 1,
+              overflow: 'hidden',
+              border: 1,
+              borderColor: 'divider',
+            }}
           >
             <ChatPanel onClose={() => setShowChat(false)} />
-          </div>
+          </Paper>
         )}
 
-        {/* Minimalist Floating Assistant Button */}
-        <button
-          ref={chatButtonRef}
-          onClick={() => setShowChat(!showChat)}
-          className={`h-11 w-11 rounded-xl flex items-center justify-center shadow-lg transition-all active:scale-95 border cursor-pointer ${
-            showChat 
-              ? 'bg-[var(--bg-surface-elevated)] text-[var(--text-primary)] border-[var(--border-active)]' 
-              : 'bg-[var(--accent-emerald)] hover:opacity-90 text-white border-[var(--accent-emerald-border)] shadow-emerald-500/20'
-          }`}
-          title={showChat ? "Close Regulatory Assistant (Esc)" : "Ask CPCB Regulatory Assistant"}
-          aria-label="Toggle Regulatory Assistant"
-        >
-          {showChat ? (
-            <Sparkles className="h-5 w-5" />
-          ) : (
-            <MessageSquareCode className="h-5 w-5" />
-          )}
-        </button>
-      </div>
-    </div>
+        <Tooltip title={showChat ? "Close Regulatory Assistant (Esc)" : "Ask CPCB Regulatory Assistant"}>
+          <Fab
+            ref={chatButtonRef}
+            onClick={() => setShowChat(!showChat)}
+            sx={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #00B4D8 0%, #0077B6 100%)',
+              color: '#FFFFFF',
+              boxShadow: '0 8px 24px rgba(0, 180, 216, 0.45), 0 2px 6px rgba(0,0,0,0.3)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #00C4EC 0%, #0096C7 100%)',
+                boxShadow: '0 12px 28px rgba(0, 180, 216, 0.6), 0 4px 8px rgba(0,0,0,0.4)',
+                transform: 'scale(1.05)',
+              },
+              '&:active': {
+                transform: 'scale(0.96)',
+              },
+            }}
+          >
+            {showChat ? <AutoAwesomeIcon sx={{ fontSize: 26 }} /> : <SmartToyIcon sx={{ fontSize: 28 }} />}
+          </Fab>
+        </Tooltip>
+      </Box>
+    </Box>
   );
 }
 

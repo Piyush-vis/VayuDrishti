@@ -1,6 +1,8 @@
 import os
 import re
 import math
+import time
+from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from backend.config import settings
 
@@ -209,6 +211,118 @@ class ChromaRAG:
 
 rag_service = ChromaRAG()
 
+# ─── helpers ────────────────────────────────────────────────────────────────
+
+from backend.models.database import db_helper
+
+_CITY_PATTERN = re.compile(
+    r"\b(delhi|mumbai|bengaluru|kolkata|chennai|hyderabad|lucknow|jabalpur|pune|ahmedabad)\b",
+    re.IGNORECASE,
+)
+_TREND_KEYWORDS = {"grow", "grew", "reduc", "trend", "last few", "days", "week", 
+                    "yesterday", "history", "change", "worse", "better", "improv"}
+
+async def _fetch_live_aqi_summary(question: str) -> str:
+    """
+    Fetches live or historical AQI summary from MongoDB for injection into the LLM prompt.
+    Detects whether the question is about current conditions OR historical trend.
+    """
+    LIVE_KEYWORDS = {"aqi", "average", "pollution", "air quality", "pm2", "pm10", "no2",
+                     "so2", "co", "o3", "index", "level", "concentration", "grow", "reduc",
+                     "trend", "days", "week", "history", "change", "worse", "better",
+                     "weather", "temperature", "humidity", "wind", "temp", "hot", "cool"}
+    q_lower = question.lower()
+    if not any(kw in q_lower for kw in LIVE_KEYWORDS):
+        return ""
+
+    city_match = _CITY_PATTERN.search(question)
+    if not city_match:
+        return ""
+    city = city_match.group(0).lower()
+    is_trend = any(kw in q_lower for kw in _TREND_KEYWORDS)
+
+    try:
+        if db_helper.stations is None:
+            db_helper.connect()
+        stations = await db_helper.stations.find({"city": city, "active": True}).to_list(50)
+        if not stations:
+            return ""
+        station_ids = [s["station_id"] for s in stations]
+
+        if is_trend:
+            # Historical daily averages for the past 7 days
+            now = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+            days_back = 7
+            daily_avgs = []
+            for d in range(days_back, -1, -1):
+                day_start = now - timedelta(days=d, hours=now.hour)
+                day_end   = day_start + timedelta(days=1)
+                cursor = db_helper.aqi_readings.find({
+                    "station_id": {"$in": station_ids},
+                    "timestamp": {"$gte": day_start, "$lt": day_end}
+                })
+                day_readings = await cursor.to_list(2000)
+                if day_readings:
+                    avg = round(sum(r["aqi"] for r in day_readings) / len(day_readings))
+                    daily_avgs.append((day_start.strftime("%d %b"), avg, len(day_readings)))
+
+            if not daily_avgs:
+                return ""
+
+            lines = [f"HISTORICAL TREND — {city.title()} Daily Average AQI (last {days_back} days):"]
+            for label, avg, count in daily_avgs:
+                bar = "█" * min(20, avg // 25)
+                lines.append(f"  {label}: AQI {avg:>3}  {bar}  ({count} readings)")
+
+            if len(daily_avgs) >= 2:
+                delta = daily_avgs[-1][1] - daily_avgs[0][1]
+                direction = "WORSENED" if delta > 0 else "IMPROVED"
+                lines.append(f"Trend: AQI {direction} by {abs(delta)} points over {days_back} days.")
+            return "\n".join(lines)
+
+        else:
+            # Current snapshot
+            readings = []
+            for s in stations:
+                r = await db_helper.aqi_readings.find_one(
+                    {"station_id": s["station_id"]}, sort=[("timestamp", -1)]
+                )
+                if r:
+                    readings.append(r)
+
+            if not readings:
+                return ""
+
+            avg_aqi  = round(sum(r["aqi"]  for r in readings) / len(readings))
+            avg_pm25 = round(sum(r.get("pm25", 0) for r in readings) / len(readings), 1)
+            avg_pm10 = round(sum(r.get("pm10", 0) for r in readings) / len(readings), 1)
+            max_aqi  = max(r["aqi"] for r in readings)
+            min_aqi  = min(r["aqi"] for r in readings)
+            sources  = list({r.get("source", "?") for r in readings})
+            ts       = readings[0].get("timestamp")
+            ts_str   = ts.strftime("%d %b %Y, %H:%M UTC") if ts else "recent"
+            # Weather from most recent reading
+            sample   = readings[0]
+            avg_temp = round(sum(r.get("temperature", 0) for r in readings) / len(readings), 1)
+            avg_hum  = round(sum(r.get("humidity", 0) for r in readings) / len(readings), 1)
+            avg_wind = round(sum(r.get("wind_speed", 0) for r in readings) / len(readings), 1)
+
+            lines = [
+                f"{city.title()} snapshot ({ts_str}):",
+                f"AQI avg {avg_aqi} (min {min_aqi}, max {max_aqi})",
+                f"PM2.5 {avg_pm25} µg/m³, PM10 {avg_pm10} µg/m³",
+                f"Temp {avg_temp}°C, Humidity {avg_hum}%, Wind {avg_wind} km/h",
+            ]
+            readings.sort(key=lambda r: r["aqi"], reverse=True)
+            for r in readings[:2]:
+                s_name = next((s["name"] for s in stations if s["station_id"] == r["station_id"]), r["station_id"])
+                lines.append(f"Worst: {s_name} AQI {r['aqi']}")
+            # Hard-cap the summary itself at 400 chars
+            return "\n".join(lines)[:400]
+    except Exception:
+        return ""
+
+
 # Main AI response generation function
 async def generate_rag_response(question: str) -> Dict[str, Any]:
     """
@@ -217,57 +331,56 @@ async def generate_rag_response(question: str) -> Dict[str, Any]:
     """
     from backend.services.llm_cache import llm_cache
 
-    # 1. Retrieve matching chunks
-    contexts = rag_service.query(question, top_k=4)
+    # 1. Retrieve matching regulatory chunks — top_k=1, tightly capped
+    contexts = rag_service.query(question, top_k=1)
     has_context = bool(contexts)
 
     if has_context:
-        context_text = "\n\n".join([f"SOURCE: {c['source']}\n{c['text']}" for c in contexts])
-        sources = list(set([c["source"] for c in contexts]))
+        # Cap each chunk at 150 chars, total at 400 chars
+        context_text = contexts[0]["text"][:300]
+        sources = [contexts[0]["source"]]
     else:
         context_text = ""
         sources = ["CPCB & NCAP Policy Framework"]
 
-    # 2. Cached-first Groq answer. Cache key = question + retrieved source set,
-    # so an identical question never re-spends quota.
+    # 2. Fetch live DB data if question is about city AQI
+    live_summary = await _fetch_live_aqi_summary(question)
+
+    # 3. Cached-first Groq answer
     async def _call_groq():
         import groq as groq_sdk
         client = groq_sdk.AsyncGroq(api_key=settings.GROQ_API_KEY)
-        
-        if has_context:
-            prompt = f"""You are VayuDrishti's AI Air Quality & Regulatory Assistant. Answer questions about Indian air quality policies, CPCB standards, and NCAP using the provided regulatory context.
 
-CRITICAL GUARDRAIL: You specialize EXCLUSIVELY in Indian air quality intelligence, environmental regulations, CPCB/NAAQS standards, NCAP targets, and smog health precautions.
-- If the user asks an off-topic question (such as general coding, Python/programming, math puzzles, recipes, or unrelated topics), you MUST decline immediately in 1-2 polite sentences: "I specialize exclusively in air quality intelligence, CPCB regulations, and environmental health. I cannot assist with programming or unrelated topics. Please feel free to ask about air quality standards, GRAP stages, or pollution guidelines."
-- NEVER write code or answer off-topic queries, and NEVER cite regulatory documents for off-topic requests.
-- For valid air quality questions, answer accurately based on the context and cite the relevant source document (e.g. NCAP GUIDELINES or NAAQS STANDARDS). Keep it concise (3-4 sentences).
+        # Build prompt in strict budget: sys(120) + q(150) + data(350) + ctx(300) = ~920 chars max
+        SYS = "You are VayuDrishti, an Indian air quality AI. Answer in 3-4 sentences. Decline off-topic questions politely."
+        q_part   = question[:150]
+        data_part = live_summary[:350] if live_summary else ""
+        ctx_part  = context_text[:300] if has_context else ""
 
-User Question: {question}
+        parts = [SYS, f"Q: {q_part}"]
+        if data_part:
+            parts.append(f"Data:\n{data_part}")
+        if ctx_part:
+            parts.append(f"Context:\n{ctx_part}")
+        prompt = "\n\n".join(parts)
 
-Regulatory Context:
-{context_text}"""
-        else:
-            prompt = f"""You are VayuDrishti's AI Air Quality & Regulatory Assistant.
+        # Safety net: if still oversized, drop context then data
+        if len(prompt) > 1200:
+            prompt = f"{SYS}\n\nQ: {q_part}\n\n{data_part[:400]}"
+        if len(prompt) > 900:
+            prompt = f"{SYS}\n\nQ: {q_part}"
 
-CRITICAL GUARDRAIL: You specialize EXCLUSIVELY in Indian air quality intelligence, environmental regulations, CPCB/NAAQS standards, NCAP targets, and smog health precautions.
-
-User message: {question}
-
-Instructions:
-- If the user is greeting you ('hello', 'hi', 'hey', etc.), greet them warmly, introduce yourself as VayuDrishti's Air Quality & Regulatory Intelligence Assistant, and suggest 2-3 specific air quality topics (e.g. CPCB NAAQS limits, GRAP emergency stages, NCAP reduction targets, or health precautions during smog).
-- If the user asks an air quality, pollution health risk, or policy question, provide an accurate, concise, and helpful explanation (3-4 sentences).
-- If the user asks an off-topic question (such as general coding, programming, math puzzles, recipes, or unrelated subjects), decline politely in 1-2 sentences: "I specialize exclusively in air quality intelligence, CPCB regulations, and environmental health. I cannot assist with programming or unrelated topics. Please feel free to ask about air quality standards, GRAP stages, or pollution guidelines." Do NOT answer off-topic queries."""
+        print(f"[RAG] prompt={len(prompt)} chars")
 
         response = await client.chat.completions.create(
             model="groq/compound",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
-            max_tokens=512,
+            max_tokens=400,
         )
         answer_text = response.choices[0].message.content.strip()
-        # If the assistant declined an off-topic request, don't return regulatory sources
-        res_sources = sources
-        if "I specialize exclusively in" in answer_text or "cannot assist with" in answer_text:
+        res_sources = sources if live_summary else sources
+        if "I specialize exclusively" in answer_text or "cannot assist with" in answer_text:
             res_sources = []
         return {"answer": answer_text, "sources": res_sources}
 
@@ -279,13 +392,19 @@ Instructions:
             if cached["result"]:
                 return {
                     **cached["result"],
-                    "provenance": cached["source"],   # cached | live
+                    "provenance": cached["source"],
                     "cached_at": cached.get("cached_at"),
                 }
         except Exception as e:
             print(f"Error calling Groq in RAG: {e}. Using snippet fallback.")
 
-    # 3. Deterministic fallback
+    # 4. Deterministic fallback — prefer live data if available
+    if live_summary:
+        return {
+            "answer": live_summary,
+            "sources": ["Live MongoDB readings"],
+            "provenance": "live-db-fallback",
+        }
     if has_context:
         best_match = contexts[0]
         return {
@@ -293,9 +412,10 @@ Instructions:
             "sources": sources,
             "provenance": "retrieval-only",
         }
-    else:
-        return {
-            "answer": "Hello! I am VayuDrishti's Air Quality & Regulatory Assistant. You can ask me about CPCB NAAQS standards, GRAP emergency measures, NCAP targets, or health precautions during high pollution episodes.",
-            "sources": ["CPCB Guidelines"],
-            "provenance": "template",
-        }
+    return {
+        "answer": "Hello! I am VayuDrishti's Air Quality & Regulatory Assistant. Ask me about CPCB NAAQS standards, GRAP emergency measures, NCAP targets, or health precautions during high pollution episodes.",
+        "sources": ["CPCB Guidelines"],
+        "provenance": "template",
+    }
+
+

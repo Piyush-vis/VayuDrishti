@@ -19,7 +19,7 @@ built on top of the same primitives:
     locations (schools/hospitals/outdoor-worker zones) itself via a tool instead of
     having them force-fed, and can call out specific at-risk locations by name.
 
-Both agents degrade to the existing deterministic/template logic if GEMINI_API_KEY is
+Both agents degrade to the existing deterministic/template logic if GROQ_API_KEY is
 absent or any step fails - preserving the resilience the rest of the app already has.
 """
 import asyncio
@@ -218,9 +218,9 @@ async def analyze_enforcement_action(action: Dict[str, Any]) -> Optional[Dict[st
     cross-referencing source attribution and the station's forecast trend - to judge
     whether it's an isolated blip or a genuine compound risk situation, and grounds
     its recommendation in regulatory context. Returns None if agents are unavailable
-    (no Gemini key / import failure) so callers can fall back gracefully.
+    (no Groq key / import failure) so callers can fall back gracefully.
     """
-    if not _AGENTS_AVAILABLE or not settings.GEMINI_API_KEY:
+    if not _AGENTS_AVAILABLE or not settings.GROQ_API_KEY:
         return None
 
     evidence = action.get("evidence", {})
@@ -274,7 +274,7 @@ async def generate_citizen_advisory_agentic(
     hospitals, outdoor-worker zones) via a tool, and can reference them by name in the
     generated guidance when conditions are severe enough to warrant it.
     """
-    if not _AGENTS_AVAILABLE or not settings.GEMINI_API_KEY:
+    if not _AGENTS_AVAILABLE or not settings.GROQ_API_KEY:
         return None
 
     system_prompt = """You are VayuDrishti's Citizen Advisory Agent for Indian cities. You generate \

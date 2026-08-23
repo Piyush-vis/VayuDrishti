@@ -1,131 +1,189 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  TrendingUp,
-  ShieldAlert,
-  BellRing,
-  BarChart3,
-  Radio,
-  History,
-  Crosshair,
-  Sparkles
-} from 'lucide-react';
+  Drawer,
+  Box,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  ListSubheader,
+  Divider,
+  Typography,
+} from '@mui/material';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import TrackChangesIcon from '@mui/icons-material/TrackChanges';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import GavelIcon from '@mui/icons-material/Gavel';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
+import HistoryIcon from '@mui/icons-material/History';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { useReplay } from '../../context/ReplayContext';
 
-const Sidebar = ({ isOpen = true }) => {
+const DRAWER_WIDTH = 240;
+
+const Sidebar = ({ open = true }) => {
+  const location = useLocation();
   const { episodes, episode, enterReplay, exitReplay } = useReplay();
-  
+
   const menuItems = [
-    { path: '/', label: 'Command Center', icon: LayoutDashboard },
-    { path: '/war-room', label: 'Incident War Room', icon: Crosshair },
-    { path: '/predictions', label: '72H Predictions', icon: TrendingUp },
-    { path: '/enforcement', label: 'Enforcement Desk', icon: ShieldAlert },
-    { path: '/advisory', label: 'Citizen Portal', icon: BellRing },
-    { path: '/compare', label: 'City Analytics', icon: BarChart3 }
+    { path: '/', label: 'Command Center', icon: DashboardIcon },
+    { path: '/war-room', label: 'Incident War Room', icon: TrackChangesIcon },
+    { path: '/predictions', label: '72H Predictions', icon: TimelineIcon },
+    { path: '/enforcement', label: 'Enforcement Desk', icon: GavelIcon },
+    { path: '/advisory', label: 'Citizen Portal', icon: NotificationsActiveIcon },
+    { path: '/compare', label: 'City Analytics', icon: CompareArrowsIcon },
   ];
 
   return (
-    <aside 
-      className={`bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] flex flex-col justify-between shrink-0 transition-all duration-200 ease-in-out ${
-        isOpen ? 'w-56' : 'w-16'
-      }`}
+    <Drawer
+      variant="persistent"
+      anchor="left"
+      open={open}
+      sx={{
+        width: open ? DRAWER_WIDTH : 0,
+        flexShrink: 0,
+        transition: (theme) =>
+          theme.transitions.create(['width', 'margin'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.standard,
+          }),
+        '& .MuiDrawer-paper': {
+          width: DRAWER_WIDTH,
+          boxSizing: 'border-box',
+          borderRight: 1,
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+        },
+      }}
     >
-      <div className="py-4 px-2.5 space-y-5 overflow-x-hidden">
-        {/* Navigation Section */}
-        <div>
-          {isOpen && (
-            <p className="px-2.5 text-[10px] font-heading font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 transition-opacity">
-              Navigation
-            </p>
-          )}
-          <nav className="space-y-1">
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+        <Box sx={{ py: 1 }}>
+          {/* Navigation Section */}
+          <List
+            dense
+            subheader={
+              <ListSubheader component="div" sx={{ bgcolor: 'transparent', typography: 'overline', color: 'text.secondary', fontWeight: 700 }}>
+                NAVIGATION
+              </ListSubheader>
+            }
+          >
             {menuItems.map((item) => {
               const Icon = item.icon;
+              const isActive = location.pathname === item.path;
               return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  title={!isOpen ? item.label : undefined}
-                  className={({ isActive }) =>
-                    `w-full flex items-center ${isOpen ? 'gap-3 px-3 py-2' : 'justify-center py-2 px-0'} rounded-lg text-xs font-heading font-semibold transition-all ${
-                      isActive
-                        ? 'bg-[var(--accent-emerald-subtle)] text-[var(--accent-emerald)] border border-[var(--accent-emerald-border)] shadow-sm'
-                        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-elevated)] hover:text-[var(--text-primary)] border border-transparent'
-                    }`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-[var(--accent-emerald)]' : 'text-[var(--text-muted)]'}`} />
-                      {isOpen && <span className="truncate">{item.label}</span>}
-                    </>
-                  )}
-                </NavLink>
+                <ListItem key={item.path} disablePadding sx={{ px: 1, my: 0.25 }}>
+                  <ListItemButton
+                    component={NavLink}
+                    to={item.path}
+                    selected={isActive}
+                    sx={{
+                      borderRadius: 1,
+                      py: 1,
+                      '&.Mui-selected': {
+                        bgcolor: 'rgba(0, 180, 216, 0.12)',
+                        color: 'primary.main',
+                        '&:hover': {
+                          bgcolor: 'rgba(0, 180, 216, 0.18)',
+                        },
+                      },
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 36, color: isActive ? 'primary.main' : 'text.secondary' }}>
+                      <Icon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={item.label}
+                      primaryTypographyProps={{
+                        variant: 'body2',
+                        fontWeight: isActive ? 600 : 500,
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
               );
             })}
-          </nav>
-        </div>
+          </List>
 
-        {/* Operating Mode / Crisis Replay */}
-        <div>
-          {isOpen && (
-            <p className="px-2.5 text-[10px] font-heading font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 transition-opacity">
-              Operating Mode
-            </p>
-          )}
-          <div className="space-y-1">
-            <button
-              onClick={exitReplay}
-              title={!isOpen ? "Real-time Stream" : undefined}
-              className={`w-full flex items-center ${isOpen ? 'gap-3 px-3 py-2' : 'justify-center py-2 px-0'} rounded-lg text-xs font-heading font-semibold transition-all border text-left cursor-pointer ${
-                !episode
-                  ? 'bg-[var(--accent-emerald-subtle)] text-[var(--accent-emerald)] border-[var(--accent-emerald-border)] shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-elevated)] hover:text-[var(--text-primary)] border-transparent'
-              }`}
-            >
-              <Radio className={`h-4 w-4 shrink-0 ${!episode ? 'text-[var(--accent-emerald)] animate-pulse' : 'text-[var(--text-muted)]'}`} />
-              {isOpen && (
-                <div className="flex-1 min-w-0">
-                  <span className="block font-bold truncate">Real-time Stream</span>
-                  <span className="block text-[10px] text-[var(--text-muted)] font-normal truncate">Live sensor feeds</span>
-                </div>
-              )}
-            </button>
+          <Divider sx={{ my: 1.5 }} />
 
-            {episodes.map((ep) => (
-              <button
-                key={ep.episode_id}
-                onClick={() => enterReplay(ep)}
-                title={ep.description}
-                className={`w-full flex items-center ${isOpen ? 'gap-3 px-3 py-2' : 'justify-center py-2 px-0'} rounded-lg text-xs font-heading font-semibold transition-all border text-left cursor-pointer ${
-                  episode?.episode_id === ep.episode_id
-                    ? 'bg-[var(--accent-purple-subtle)] text-[var(--accent-purple)] border-[var(--accent-purple-border)] shadow-sm'
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-elevated)] hover:text-[var(--text-primary)] border-transparent'
-                }`}
+          {/* Operating Mode / Crisis Replay */}
+          <List
+            dense
+            subheader={
+              <ListSubheader component="div" sx={{ bgcolor: 'transparent', typography: 'overline', color: 'text.secondary', fontWeight: 700 }}>
+                OPERATING MODE
+              </ListSubheader>
+            }
+          >
+            {/* Real-time Stream */}
+            <ListItem disablePadding sx={{ px: 1, my: 0.25 }}>
+              <ListItemButton
+                onClick={exitReplay}
+                selected={!episode}
+                sx={{
+                  borderRadius: 1,
+                  py: 1,
+                  '&.Mui-selected': {
+                    bgcolor: 'rgba(129, 199, 132, 0.12)',
+                    color: 'success.main',
+                  },
+                }}
               >
-                <History className="h-4 w-4 shrink-0" />
-                {isOpen && (
-                  <div className="flex-1 min-w-0">
-                    <span className="block font-bold leading-tight truncate">{ep.label}</span>
-                    <span className="block text-[10px] text-[var(--text-muted)] font-normal truncate">Crisis Episode</span>
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+                <ListItemIcon sx={{ minWidth: 36, color: !episode ? 'success.main' : 'text.secondary' }}>
+                  <RadioButtonCheckedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Real-time Stream"
+                  secondary="Live sensor feeds"
+                  primaryTypographyProps={{ variant: 'body2', fontWeight: !episode ? 600 : 500 }}
+                  secondaryTypographyProps={{ variant: 'caption', fontSize: '0.7rem' }}
+                />
+              </ListItemButton>
+            </ListItem>
 
-      {/* Intelligence Status Badge at Sidebar Bottom */}
-      <div className={`p-2.5 border-t border-[var(--border-subtle)] bg-[var(--bg-surface-elevated)] ${!isOpen ? 'text-center' : ''}`}>
-        <div className={`flex items-center ${isOpen ? 'gap-2' : 'justify-center'} text-[11px] text-[var(--text-secondary)]`}>
-          <Sparkles className="h-3.5 w-3.5 text-[var(--accent-emerald)] shrink-0" />
-          {isOpen && <span className="font-heading font-semibold truncate">Groq & XGBoost L168</span>}
-        </div>
-        {isOpen && <p className="text-[10px] font-mono text-[var(--text-muted)] mt-0.5 truncate">VayuDrishti v2.4 Release</p>}
-      </div>
-    </aside>
+            {/* Crisis Episodes */}
+            {episodes.map((ep) => (
+              <ListItem key={ep.episode_id} disablePadding sx={{ px: 1, my: 0.25 }}>
+                <ListItemButton
+                  onClick={() => enterReplay(ep)}
+                  selected={episode?.episode_id === ep.episode_id}
+                  sx={{
+                    borderRadius: 1,
+                    py: 1,
+                    '&.Mui-selected': {
+                      bgcolor: 'rgba(255, 183, 77, 0.12)',
+                      color: 'warning.main',
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 36, color: episode?.episode_id === ep.episode_id ? 'warning.main' : 'text.secondary' }}>
+                    <HistoryIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={ep.label}
+                    secondary="Crisis Episode"
+                    primaryTypographyProps={{ variant: 'body2', fontWeight: episode?.episode_id === ep.episode_id ? 600 : 500 }}
+                    secondaryTypographyProps={{ variant: 'caption', fontSize: '0.7rem' }}
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+
+        {/* Bottom System Info: Only App Name */}
+        <Box sx={{ p: 2, pb: 3, borderTop: 1, borderColor: 'divider', bgcolor: 'background.default', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AutoAwesomeIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main', letterSpacing: '0.04em' }}>
+            VayuDrishti
+          </Typography>
+        </Box>
+      </Box>
+    </Drawer>
   );
 };
 

@@ -1,15 +1,19 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
-import { useTheme } from '../../context/ThemeContext';
+import { Box, Typography } from '@mui/material';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { useTheme } from '@mui/material/styles';
 
 const PollutantBreakdown = ({ reading }) => {
-  const { isDark } = useTheme();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
 
   if (!reading) {
     return (
-      <div className="h-44 flex items-center justify-center text-xs text-[var(--text-muted)] font-heading">
-        Select any station marker to inspect pollutant breakdown.
-      </div>
+      <Box sx={{ height: 176, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="caption" color="text.secondary">
+          Select any station marker to inspect pollutant breakdown.
+        </Typography>
+      </Box>
     );
   }
 
@@ -22,31 +26,33 @@ const PollutantBreakdown = ({ reading }) => {
     { name: 'CO', value: Math.round((reading.co || 0) * 100), limit: 200, unit: 'µg/m³' }
   ];
 
-  const gridColor = isDark ? '#233044' : '#E2E8F0';
-  const tickColor = isDark ? '#94A3B8' : '#64748B';
+  const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0';
+  const tickColor = isDark ? '#E2E8F0' : '#334155';
 
   const getBarColor = (val, limit) => {
-    if (val > limit * 1.5) return '#EF4444'; // severe breach
-    if (val > limit) return '#F59E0B'; // moderate breach
-    return '#10B981'; // within standard
+    if (val > limit * 1.5) return '#CF6679'; // severe breach
+    if (val > limit) return '#FFB74D'; // moderate breach
+    return '#81C784'; // within standard
   };
 
   return (
-    <div className="w-full h-44">
+    <Box sx={{ width: '100%', height: 176 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 6 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
           <XAxis 
             dataKey="name" 
             stroke={tickColor} 
-            fontSize={10} 
-            fontFamily="var(--font-mono)"
+            fontSize={11} 
+            fontWeight={600}
+            fontFamily="monospace"
             tickLine={false}
+            dy={4}
           />
           <YAxis 
             stroke={tickColor} 
             fontSize={10}
-            fontFamily="var(--font-mono)"
+            fontFamily="monospace"
             tickLine={false}
           />
           <Tooltip
@@ -57,33 +63,46 @@ const PollutantBreakdown = ({ reading }) => {
                 const ratio = ((item.value / item.limit) * 100).toFixed(0);
 
                 return (
-                  <div className="p-3 rounded-lg border shadow-xl text-xs space-y-1.5 font-mono"
-                       style={{
-                         backgroundColor: isDark ? '#131B2A' : '#FFFFFF',
-                         borderColor: isDark ? '#233044' : '#E2E8F0',
-                         color: isDark ? '#F8FAFC' : '#0F172A'
-                       }}>
-                    <div className="flex justify-between items-center gap-4">
-                      <span className="font-bold text-sm">{item.name}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                        isExceeded ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'
-                      }`}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 1,
+                      border: 1,
+                      borderColor: 'divider',
+                      boxShadow: 3,
+                      bgcolor: 'background.paper',
+                      fontFamily: 'monospace',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 0.5 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{item.name}</Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          px: 0.75,
+                          py: 0.25,
+                          borderRadius: 0.5,
+                          fontWeight: 700,
+                          bgcolor: isExceeded ? 'rgba(207, 102, 121, 0.15)' : 'rgba(129, 199, 132, 0.15)',
+                          color: isExceeded ? 'error.main' : 'success.main',
+                        }}
+                      >
                         {ratio}% of Limit
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[var(--text-secondary)]">
-                      Current Level: <span className="font-bold text-[var(--text-primary)]">{item.value} {item.unit}</span>
-                    </p>
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      CPCB NAAQS Standard: {item.limit} {item.unit}
-                    </p>
-                  </div>
+                      </Typography>
+                    </Box>
+                    <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                      Recorded: <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>{item.value} {item.unit}</Box>
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block', color: 'text.disabled' }}>
+                      NAAQS Standard: {item.limit} {item.unit}
+                    </Typography>
+                  </Box>
                 );
               }
               return null;
             }}
           />
-          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+          <Bar dataKey="value" radius={[3, 3, 0, 0]}>
             {data.map((entry, index) => (
               <Cell 
                 key={`cell-${index}`} 
@@ -93,7 +112,7 @@ const PollutantBreakdown = ({ reading }) => {
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-    </div>
+    </Box>
   );
 };
 

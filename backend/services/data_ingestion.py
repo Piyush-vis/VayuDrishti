@@ -1,10 +1,15 @@
 import asyncio
 import httpx
 import random
+import time
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from backend.config import settings
 from backend.models.database import db_helper
+
+# Throttle concurrent AQICN calls — the free tier rate-limits hard on burst requests.
+# 5 simultaneous calls is a safe ceiling; the rest queue behind the semaphore.
+_AQICN_SEMAPHORE = asyncio.Semaphore(5)
 
 CITIES_COORDS = {
     "delhi": {"lat": 28.6139, "lon": 77.2090, "name": "Delhi"},
@@ -263,47 +268,71 @@ async def fetch_openmeteo_weather(lat: float, lon: float) -> Dict[str, Any]:
 async def fetch_aqicn_aqi(station_name: str) -> Dict[str, Any]:
     """
     Fetch real air quality data from AQICN API.
+    Rejects stale feeds (>48h old) or sensor fault sentinels (e.g. 999) so the
+    ingestion pipeline falls back cleanly to live OpenWeatherMap data.
     """
     if not settings.AQICN_API_KEY:
         return {}
         
     url = f"https://api.waqi.info/feed/{station_name}/?token={settings.AQICN_API_KEY}"
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url)
-            if resp.status_code == 200:
-                body = resp.json()
-                if body.get("status") == "ok":
-                    data = body.get("data", {})
-                    iaqi = data.get("iaqi", {})
+        async with _AQICN_SEMAPHORE:  # cap concurrent AQICN requests to 5
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    body = resp.json()
+                    if body.get("status") == "ok":
+                        data = body.get("data", {})
 
-                    # AQICN's iaqi.*.v values are AQI sub-index numbers (0-500), NOT raw
-                    # ug/m3 concentrations. Invert each through the CPCB breakpoint table so
-                    # what we store downstream is dimensionally consistent with
-                    # calculate_indian_aqi()'s expectations.
-                    pm25 = sub_index_to_concentration("pm25", iaqi.get("pm25", {}).get("v"))
-                    pm10 = sub_index_to_concentration("pm10", iaqi.get("pm10", {}).get("v"))
-                    no2 = sub_index_to_concentration("no2", iaqi.get("no2", {}).get("v"))
-                    so2 = sub_index_to_concentration("so2", iaqi.get("so2", {}).get("v"))
-                    o3 = sub_index_to_concentration("o3", iaqi.get("o3", {}).get("v"))
-                    co = sub_index_to_concentration("co", iaqi.get("co", {}).get("v"))
+                        # Staleness check: reject readings older than 48 hours
+                        time_epoch = data.get("time", {}).get("v")
+                        if time_epoch:
+                            age_hours = (time.time() - time_epoch) / 3600.0
+                            if age_hours > 48:
+                                return {}
 
-                    return {
-                        "aqi_source": data.get("aqi"),
-                        "pm25": pm25,
-                        "pm10": pm10,
-                        "no2": no2,
-                        "so2": so2,
-                        "o3": o3,
-                        "co": co
-                    }
+                        iaqi = data.get("iaqi", {})
+
+                        def clean_sub_index(pol: str) -> float:
+                            v = iaqi.get(pol, {}).get("v")
+                            # 999, negative, or > 500 are WAQI sensor fault / offline sentinels
+                            if v is None or v >= 500 or v < 0:
+                                return 0.0
+                            return sub_index_to_concentration(pol, v)
+
+                        pm25 = clean_sub_index("pm25")
+                        pm10 = clean_sub_index("pm10")
+                        no2  = clean_sub_index("no2")
+                        so2  = clean_sub_index("so2")
+                        o3   = clean_sub_index("o3")
+                        co   = clean_sub_index("co")
+
+                        # If no valid particulate reading exists, fall back to OWM
+                        if pm25 == 0.0 and pm10 == 0.0 and no2 == 0.0:
+                            return {}
+
+                        return {
+                            "aqi_source": data.get("aqi"),
+                            "pm25": pm25,
+                            "pm10": pm10,
+                            "no2": no2,
+                            "so2": so2,
+                            "o3": o3,
+                            "co": co
+                        }
     except Exception as e:
-        print(f"Error fetching AQICN AQI: {e}")
+        # Log the exception type so empty-message errors are still identifiable
+        print(f"Error fetching AQICN AQI ({type(e).__name__}): {e}")
     return {}
 
 async def fetch_openweathermap_aqi(lat: float, lon: float) -> Dict[str, Any]:
     """
     Fetch air pollution data from OpenWeatherMap API.
+
+    Unit note: OWM returns ALL components in µg/m³, including CO.
+    CPCB NAQI breakpoints for CO use mg/m³ (0-1, 1-2, 2-10, 10-17, 17-34, 34+).
+    CO must be divided by 1000 before passing to calculate_indian_aqi().
+    All other pollutants (PM2.5, PM10, NO2, SO2, O3) are already in µg/m³ — no conversion needed.
     """
     if not getattr(settings, "OPENWEATHERMAP_API_KEY", None):
         return {}
@@ -322,7 +351,8 @@ async def fetch_openweathermap_aqi(lat: float, lon: float) -> Dict[str, Any]:
                         "no2": components.get("no2", 0.0),
                         "so2": components.get("so2", 0.0),
                         "o3": components.get("o3", 0.0),
-                        "co": components.get("co", 0.0)
+                        # OWM gives CO in µg/m³; CPCB breakpoints use mg/m³ → ÷1000
+                        "co": components.get("co", 0.0) / 1000.0,
                     }
     except Exception as e:
         print(f"Error fetching OpenWeatherMap AQI: {e}")
@@ -331,7 +361,12 @@ async def fetch_openweathermap_aqi(lat: float, lon: float) -> Dict[str, Any]:
 async def ingest_live_data_for_station(station: Dict[str, Any]) -> Dict[str, Any]:
     """
     Ingest live air quality and weather data for a single station.
-    Tries real API first, falls back to simulated generator if keys are missing or requests fail.
+    Priority:
+      1. AQICN via known aqicn_uid (most reliable — direct numeric ID)
+      2. AQICN via name keyword search (fallback for unmapped stations)
+      3. OpenWeatherMap lat/lon API
+      4. Simulated data (last resort)
+    Weather always comes from Open-Meteo (free, no key needed).
     """
     station_id = station["station_id"]
     lat = station["latitude"]
@@ -340,34 +375,47 @@ async def ingest_live_data_for_station(station: Dict[str, Any]) -> Dict[str, Any
     
     timestamp = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
     
-    # 1. Fetch real weather (Open-Meteo is free, no key needed)
+    # 1. Real weather always from Open-Meteo (free, no API key needed)
     weather_data = await fetch_openmeteo_weather(lat, lon)
     
-    # 2. Fetch AQI data
+    # 2. Fetch AQI data — prefer known UID, fall through chain
     aqi_data = {}
+    data_source = "simulated"
+
     if getattr(settings, "AQICN_API_KEY", None):
-        # Try station name search keyword
-        search_keyword = station["name"].split(",")[0]
-        aqi_data = await fetch_aqicn_aqi(search_keyword)
-    elif getattr(settings, "OPENWEATHERMAP_API_KEY", None):
-        aqi_data = await fetch_openweathermap_aqi(lat, lon)
+        uid = station.get("aqicn_uid")
+        if uid:
+            # Use numeric UID directly — 100% reliable match
+            aqi_data = await fetch_aqicn_aqi(f"@{uid}")
+            if aqi_data:
+                data_source = "live:aqicn"
         
-    # 3. Merge or fallback
+        if not aqi_data:
+            # Fallback: name-based search (works for stations not yet mapped)
+            search_keyword = station["name"].split(",")[0]
+            aqi_data = await fetch_aqicn_aqi(search_keyword)
+            if aqi_data:
+                data_source = "live:aqicn"
+
+    if not aqi_data and getattr(settings, "OPENWEATHERMAP_API_KEY", None):
+        aqi_data = await fetch_openweathermap_aqi(lat, lon)
+        if aqi_data:
+            data_source = "live:owm"
+        
+    # 3. Build reading
     if aqi_data:
-        # We got real AQI readings. Ensure concentration values are valid, else supplement
         pm25 = aqi_data.get("pm25") or random.uniform(20.0, 50.0)
         pm10 = aqi_data.get("pm10") or random.uniform(40.0, 80.0)
-        no2 = aqi_data.get("no2") or random.uniform(10.0, 30.0)
-        so2 = aqi_data.get("so2") or random.uniform(2.0, 10.0)
-        o3 = aqi_data.get("o3") or random.uniform(15.0, 35.0)
-        co = aqi_data.get("co") or random.uniform(0.2, 0.8)
+        no2  = aqi_data.get("no2")  or random.uniform(10.0, 30.0)
+        so2  = aqi_data.get("so2")  or random.uniform(2.0, 10.0)
+        o3   = aqi_data.get("o3")   or random.uniform(15.0, 35.0)
+        co   = aqi_data.get("co")   or random.uniform(0.2, 0.8)
         
         aqi = calculate_indian_aqi(pm25, pm10, no2, so2, o3, co)
         
-        # Merge OpenMeteo weather
-        temp = weather_data.get("temperature") or random.uniform(20.0, 35.0)
-        hum = weather_data.get("humidity") or random.uniform(40.0, 80.0)
-        w_spd = weather_data.get("wind_speed") or random.uniform(2.0, 12.0)
+        temp  = weather_data.get("temperature")  or random.uniform(20.0, 35.0)
+        hum   = weather_data.get("humidity")      or random.uniform(40.0, 80.0)
+        w_spd = weather_data.get("wind_speed")    or random.uniform(2.0, 12.0)
         w_dir = weather_data.get("wind_direction") or random.randint(0, 359)
         precip = weather_data.get("precipitation") or 0.0
 
@@ -387,24 +435,24 @@ async def ingest_live_data_for_station(station: Dict[str, Any]) -> Dict[str, Any
             "wind_speed": round(w_spd, 1),
             "wind_direction": int(w_dir),
             "precipitation": round(precip, 1),
-            "source": "api"
+            "source": data_source,
         }
     else:
-        # Fallback to simulated reading generator
+        # Simulator last resort
         reading = generate_simulated_readings(station, timestamp)
-        # Overlay real weather data if Open-Meteo returned it successfully!
+        reading["source"] = "simulated"
         if weather_data:
-            reading["temperature"] = weather_data["temperature"]
-            reading["humidity"] = weather_data["humidity"]
-            reading["wind_speed"] = weather_data["wind_speed"]
-            reading["wind_direction"] = weather_data["wind_direction"]
-            reading["precipitation"] = weather_data.get("precipitation") or 0.0
-            # Recalculate AQI just in case
+            reading["temperature"]    = weather_data.get("temperature", reading["temperature"])
+            reading["humidity"]       = weather_data.get("humidity", reading["humidity"])
+            reading["wind_speed"]     = weather_data.get("wind_speed", reading["wind_speed"])
+            reading["wind_direction"] = weather_data.get("wind_direction", reading["wind_direction"])
+            reading["precipitation"]  = weather_data.get("precipitation") or 0.0
             reading["aqi"] = calculate_indian_aqi(
-                reading["pm25"], reading["pm10"], reading["no2"], reading["so2"], reading["o3"], reading["co"]
+                reading["pm25"], reading["pm10"], reading["no2"],
+                reading["so2"], reading["o3"], reading["co"]
             )
             
-    # 4. Save to database (Upsert using unique index (station_id, timestamp))
+    # 4. Upsert to DB
     try:
         await db_helper.aqi_readings.update_one(
             {"station_id": station_id, "timestamp": timestamp},
@@ -412,9 +460,10 @@ async def ingest_live_data_for_station(station: Dict[str, Any]) -> Dict[str, Any
             upsert=True
         )
     except Exception as e:
-        print(f"Error saving live reading for {station_id}: {e}")
+        print(f"Error saving reading for {station_id}: {e}")
         
     return reading
+
 
 async def ingest_all_cities():
     """
