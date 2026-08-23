@@ -23,20 +23,33 @@ async def lifespan(app: FastAPI):
     print("VayuDrishti API Starting Up...")
     from backend.models.database import db_helper, seed_database
     from backend.services.scheduler import start_scheduler
-    db_helper.connect()
-    await seed_database()
+    
+    try:
+        db_helper.connect()
+        await seed_database()
+    except Exception as e:
+        print(f"[WARNING] Database seed error during startup: {e}")
+
     # Materialise the Dec 2025 crisis replay episode so a judge's first click on
     # the scenario switcher never sees an empty chart (idempotent).
-    from backend.services.replay import replay_service
     try:
+        from backend.services.replay import replay_service
         await replay_service.ensure_episode_seeded("dec2025_delhi_severe")
     except Exception as e:
         print(f"[WARNING] Replay episode seeding failed: {e}")
-    start_scheduler()
+
+    try:
+        start_scheduler()
+    except Exception as e:
+        print(f"[WARNING] Scheduler start failed: {e}")
+
     yield
     # Shutdown tasks
     print("VayuDrishti API Shutting Down...")
-    db_helper.disconnect()
+    try:
+        db_helper.disconnect()
+    except Exception:
+        pass
 
 app = FastAPI(
     title="VayuDrishti (वायुदृष्टि) API",
